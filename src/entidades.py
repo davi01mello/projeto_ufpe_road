@@ -23,7 +23,7 @@ class Entidade(pygame.sprite.Sprite):
 
 class Aluno(Entidade):
     def __init__(self, x, y):
-        super().__init__(x, y, 40, 40, AZUL_UFPE, "aluno.png")
+        super().__init__(x, y, 80, 80, AZUL_UFPE, "aluno.png")
         self.velocidade = 5 
         self.velocidade_x = 0
         self.velocidade_y = 0
@@ -66,7 +66,7 @@ class Coletavel(Entidade):
     def __init__(self, cor, tipo, nome_imagem):
         x = random.randint(50, LARGURA_TELA - 50)
         y = random.randint(50, ALTURA_TELA - 200) 
-        super().__init__(x, y, 30, 30, cor, nome_imagem)
+        super().__init__(x, y, 65, 65, cor, nome_imagem)
         self.tipo = tipo
 
 class FragmentoCracha(Coletavel):
@@ -77,7 +77,7 @@ class FragmentoCracha(Coletavel):
 class Energetico(Coletavel):
     def __init__(self):
         # Prata (Lata) - Efeito Matrix
-        super().__init__((192, 192, 192), "energetico", "energetico.png")
+        super().__init__((192, 192, 192), "energetico", "raio.png")
 
 class Escudo(Coletavel):
     def __init__(self):
@@ -95,7 +95,7 @@ class Obstaculo(Entidade):
         if tipo == "circular":
             velocidade_base = random.randint(7, 10) # Rápido
             img = "onibus.png"
-            largura, altura = 80, 40
+            largura, altura = 150, 75
         elif tipo == "obra":
             velocidade_base = 0 # Parado
             img = "cone.png"
@@ -105,7 +105,7 @@ class Obstaculo(Entidade):
         else: # Carro normal
             velocidade_base = random.randint(3, 6)
             img = "carro.png"
-            largura, altura = 50, 30
+            largura, altura = 130, 75
 
         if lado == "esquerda":
             x = -100
