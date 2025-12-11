@@ -1,148 +1,183 @@
 import pygame
 import sys
 import random
+import os
 from src.config import *
-from src.entidades import Aluno, Cracha, Comida, Raio, Obstaculo
+from src.entidades import Aluno, FragmentoCracha, Energetico, Escudo, Obstaculo
 
 class Game:
     def __init__(self):
         pygame.init()
         pygame.font.init()
-        
         self.tela = pygame.display.set_mode((LARGURA_TELA, ALTURA_TELA))
-        pygame.display.set_caption(TITULO_JOGO)
+        pygame.display.set_caption("UFPE Road: Rumo ao CIn")
         self.relogio = pygame.time.Clock()
         self.rodando = True
+        self.estado = "MENU"
         
-        # Estados do Jogo
-        self.estado = "MENU" # Pode ser: MENU, JOGANDO, GAME_OVER
+        self.fonte_hud = pygame.font.SysFont("Arial", 20, bold=True)
+        self.fonte_grande = pygame.font.SysFont("Arial", 40, bold=True)
+        
+        # Variáveis do Efeito Matrix (Câmera Lenta)
+        self.slow_motion = False
+        self.fim_slow_motion = 0
 
-        # Fontes
-        self.fonte_titulo = pygame.font.SysFont("Arial", 50, bold=True)
-        self.fonte_texto = pygame.font.SysFont("Arial", 24)
-
-        # Inicia variáveis
+        # Carrega Fundo
+        try:
+            caminho_fundo = os.path.join("assets", "img", "fundo.png")
+            self.fundo = pygame.transform.scale(pygame.image.load(caminho_fundo), (LARGURA_TELA, ALTURA_TELA))
+        except: self.fundo = None
+        
         self.resetar_jogo()
 
     def resetar_jogo(self):
-        """Reinicia tudo para um novo jogo"""
         self.todos_sprites = pygame.sprite.Group()
         self.coletaveis = pygame.sprite.Group()
         self.obstaculos = pygame.sprite.Group()
         
-        self.jogador = Aluno(LARGURA_TELA // 2, ALTURA_TELA - 100)
+        self.jogador = Aluno(LARGURA_TELA // 2, ALTURA_TELA - 60)
         self.todos_sprites.add(self.jogador)
-
+        
         self.ultimo_spawn = pygame.time.get_ticks()
-        self.intervalo_spawn = 1500 
-
-        for _ in range(5):
-            self.criar_coletavel()
+        self.intervalo_spawn = 1500
+        
+        # Limpar efeitos
+        self.slow_motion = False
+        
+        # Spawnar itens iniciais
+        for _ in range(3): self.criar_coletavel()
 
     def criar_coletavel(self):
-        classe_item = random.choice([Cracha, Comida, Raio])
-        item = classe_item()
+        # 60% chance de Fragmento, 20% Energético, 20% Escudo
+        sorteio = random.random()
+        if sorteio < 0.6: item = FragmentoCracha()
+        elif sorteio < 0.8: item = Energetico()
+        else: item = Escudo()
+        
         self.todos_sprites.add(item)
         self.coletaveis.add(item)
 
     def criar_obstaculo(self):
-        inimigo = Obstaculo()
+        # 20% chance de Circular (Rápido), 80% Carro normal
+        tipo = "circular" if random.random() < 0.2 else "carro"
+        inimigo = Obstaculo(tipo)
         self.todos_sprites.add(inimigo)
         self.obstaculos.add(inimigo)
 
     def eventos(self):
         for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                self.rodando = False
+            if event.type == pygame.QUIT: self.rodando = False
             
-            # --- EVENTOS NO MENU ---
             if self.estado == "MENU":
-                if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_RETURN: # Enter começa o jogo
-                        self.estado = "JOGANDO"
+                if event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN:
+                    self.estado = "JOGANDO"
             
-            # --- EVENTOS JOGANDO ---
             elif self.estado == "JOGANDO":
                 if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_LEFT: self.jogador.mover(-5, 0)
-                    if event.key == pygame.K_RIGHT: self.jogador.mover(5, 0)
-                    if event.key == pygame.K_UP: self.jogador.mover(0, -5)
-                    if event.key == pygame.K_DOWN: self.jogador.mover(0, 5)
-
+                    if event.key == pygame.K_LEFT: self.jogador.mover(-1, 0)
+                    if event.key == pygame.K_RIGHT: self.jogador.mover(1, 0)
+                    if event.key == pygame.K_UP: self.jogador.mover(0, -1)
+                    if event.key == pygame.K_DOWN: self.jogador.mover(0, 1)
                 if event.type == pygame.KEYUP:
-                    if event.key in [pygame.K_LEFT, pygame.K_RIGHT]:
-                        self.jogador.velocidade_x = 0
-                    if event.key in [pygame.K_UP, pygame.K_DOWN]:
-                        self.jogador.velocidade_y = 0
+                    if event.key in [pygame.K_LEFT, pygame.K_RIGHT, pygame.K_UP, pygame.K_DOWN]:
+                        self.jogador.mover(0, 0)
             
-            # --- EVENTOS GAME OVER ---
-            elif self.estado == "GAME_OVER":
-                if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_r: # R reinicia
-                        self.resetar_jogo()
-                        self.estado = "JOGANDO"
+            elif self.estado in ["GAME_OVER", "VITORIA"]:
+                if event.type == pygame.KEYDOWN and event.key == pygame.K_r:
+                    self.resetar_jogo()
+                    self.estado = "JOGANDO"
 
     def atualizar(self):
-        if self.estado != "JOGANDO":
-            return # Se não estiver jogando, não mexe nada
+        if self.estado != "JOGANDO": return
 
-        self.todos_sprites.update()
-
-        # Spawns
+        # --- Lógica do Slow Motion ---
         agora = pygame.time.get_ticks()
+        if self.slow_motion and agora > self.fim_slow_motion:
+            self.slow_motion = False
+            print("🕒 Efeito Matrix acabou.")
+
+        # Passamos o slow_motion para os obstáculos saberem como se comportar
+        self.obstaculos.update(self.slow_motion)
+        self.jogador.update()
+        self.coletaveis.update() # Itens parados não mudam, mas precisa chamar
+
+        # Gerar Obstáculos
         if agora - self.ultimo_spawn > self.intervalo_spawn:
             self.criar_obstaculo()
             self.ultimo_spawn = agora
 
-        # Colisões
+        # --- Colisões: Itens ---
         hits = pygame.sprite.spritecollide(self.jogador, self.coletaveis, True)
         for hit in hits:
-            if hit.tipo == "cracha": self.jogador.pontos += 10
-            elif hit.tipo == "comida": self.jogador.vida = min(100, self.jogador.vida + 10)
+            if hit.tipo == "fragmento":
+                self.jogador.fragmentos += 1
+                print(f"🧩 Fragmento pego! Total: {self.jogador.fragmentos}/4")
+                if self.jogador.fragmentos >= 4:
+                    self.estado = "VITORIA"
+            
+            elif hit.tipo == "energetico":
+                self.slow_motion = True
+                self.fim_slow_motion = agora + 5000 # 5 segundos
+                print("⚡ MATRIX MODE: Inimigos lentos!")
+            
+            elif hit.tipo == "escudo":
+                self.jogador.tem_escudo = True
+                print("🛡️ ESCUDO ATIVO!")
+            
             self.criar_coletavel()
 
-        dano = pygame.sprite.spritecollide(self.jogador, self.obstaculos, False)
-        if dano:
-            self.jogador.vida -= 1
-            if self.jogador.vida <= 0:
+        # --- Colisões: Obstáculos ---
+        colisao_inimigo = pygame.sprite.spritecollide(self.jogador, self.obstaculos, False)
+        if colisao_inimigo:
+            # Empurra o jogador para trás para não colidir 60 vezes por segundo
+            if self.jogador.velocidade_y < 0: self.jogador.rect.y += 30
+            else: self.jogador.rect.y -= 30
+            
+            # Chama a função receber_dano do Aluno (retorna True se machucou de verdade)
+            levou_dano = self.jogador.receber_dano()
+            
+            if levou_dano and self.jogador.vida <= 0:
                 self.estado = "GAME_OVER"
 
-    def desenhar_menu(self):
-        self.tela.fill(AZUL_UFPE) # Fundo azul
-        
-        titulo = self.fonte_titulo.render("UFPE ROAD", True, BRANCO)
-        instrucao = self.fonte_texto.render("Pressione ENTER para começar", True, BRANCO)
-        
-        rect_titulo = titulo.get_rect(center=(LARGURA_TELA/2, ALTURA_TELA/2 - 50))
-        rect_instr = instrucao.get_rect(center=(LARGURA_TELA/2, ALTURA_TELA/2 + 20))
-        
-        self.tela.blit(titulo, rect_titulo)
-        self.tela.blit(instrucao, rect_instr)
-
     def desenhar_hud(self):
-        pontos = self.fonte_texto.render(f"PONTOS: {self.jogador.pontos}", True, PRETO)
-        vida = self.fonte_texto.render(f"VIDA: {self.jogador.vida}%", True, VERMELHO)
-        self.tela.blit(pontos, (10, 10))
-        self.tela.blit(vida, (LARGURA_TELA - 150, 10))
-
-    def desenhar_game_over(self):
-        self.tela.fill(PRETO)
-        texto = self.fonte_titulo.render("GAME OVER", True, VERMELHO)
-        restart = self.fonte_texto.render("Pressione 'R' para Reiniciar", True, BRANCO)
+        # Fundo do HUD
+        pygame.draw.rect(self.tela, (200, 200, 200), (0, 0, LARGURA_TELA, 40))
         
-        self.tela.blit(texto, (LARGURA_TELA/2 - 100, ALTURA_TELA/2 - 50))
-        self.tela.blit(restart, (LARGURA_TELA/2 - 120, ALTURA_TELA/2 + 20))
+        texto_frag = self.fonte_hud.render(f"🧩 Crachá: {self.jogador.fragmentos}/4", True, PRETO)
+        texto_vida = self.fonte_hud.render(f"❤️ Vidas: {self.jogador.vida}", True, VERMELHO)
+        
+        self.tela.blit(texto_frag, (10, 10))
+        self.tela.blit(texto_vida, (LARGURA_TELA - 120, 10))
+
+        # Avisos de PowerUp
+        if self.jogador.tem_escudo:
+            self.tela.blit(self.fonte_hud.render("🛡️ BLINDADO", True, (0, 0, 255)), (LARGURA_TELA/2 - 50, 10))
+        elif self.slow_motion:
+            self.tela.blit(self.fonte_hud.render("🕒 MATRIX", True, (100, 100, 100)), (LARGURA_TELA/2 - 40, 10))
 
     def desenhar(self):
         if self.estado == "MENU":
-            self.desenhar_menu()
+            self.tela.fill(AZUL_UFPE)
+            msg = self.fonte_grande.render("ENTER para Jogar", True, BRANCO)
+            self.tela.blit(msg, (LARGURA_TELA//2 - 150, ALTURA_TELA//2))
+        
         elif self.estado == "JOGANDO":
-            self.tela.fill(BRANCO)
+            if self.fundo: self.tela.blit(self.fundo, (0, 0))
+            else: self.tela.fill(BRANCO)
+            
             self.todos_sprites.draw(self.tela)
             self.desenhar_hud()
+            
         elif self.estado == "GAME_OVER":
-            self.desenhar_game_over()
-        
+            self.tela.fill(PRETO)
+            msg = self.fonte_grande.render("GAME OVER (R para reiniciar)", True, VERMELHO)
+            self.tela.blit(msg, (LARGURA_TELA//2 - 250, ALTURA_TELA//2))
+
+        elif self.estado == "VITORIA":
+            self.tela.fill((0, 200, 0)) # Verde
+            msg = self.fonte_grande.render("PARABÉNS! CHEGOU NO CIn!", True, BRANCO)
+            self.tela.blit(msg, (LARGURA_TELA//2 - 250, ALTURA_TELA//2))
+            
         pygame.display.flip()
 
     def rodar(self):
