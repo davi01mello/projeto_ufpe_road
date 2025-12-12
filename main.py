@@ -137,20 +137,28 @@ class Game:
                 self.running = False
             
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_LEFT:
+                # --- ESQUERDA (Seta ou A) ---
+                if event.key == pygame.K_LEFT or event.key == pygame.K_a:
                     self.player.move(-1, 0)
-                elif event.key == pygame.K_RIGHT:
+
+                # --- DIREITA (Seta ou D) ---
+                elif event.key == pygame.K_RIGHT or event.key == pygame.K_d:
                     self.player.move(1, 0)
-                elif event.key == pygame.K_DOWN:
-                    self.player.move(0, 1) # Pode descer na tela
+
+                # --- BAIXO (Seta ou S) -> Olha para Frente ---
+                elif event.key == pygame.K_DOWN or event.key == pygame.K_s:
+                    self.player.move(0, 1) 
                 
-                elif event.key == pygame.K_UP:
-                    # NOVO: Lógica da Esteira
-                    # Se o player estiver acima da linha 4 (topo da tela)
+                # --- CIMA (Seta ou W) -> Olha para Costas ---
+                elif event.key == pygame.K_UP or event.key == pygame.K_w:
+                    # Lógica da Esteira (Scroll)
                     if self.player.grid_y < 4:
-                        self.scroll_world() # O Player fica, o mundo desce
+                        self.scroll_world() 
+                        # CORREÇÃO: Como o player não chama 'move',
+                        # forçamos a sprite de costas manualmente aqui:
+                        self.player.update_sprite("back")
                     else:
-                        self.player.move(0, -1) # O Player sobe na tela
+                        self.player.move(0, -1)
 
     # ... RESTO DO CÓDIGO (draw_text, Telas, Run, Update, Draw) IGUAL AO ANTERIOR ...
     # Copie as funções draw_text, show_start_screen, etc. do código anterior ou mantenha
@@ -162,57 +170,50 @@ class Game:
         self.screen.blit(img, rect)
 
     def show_start_screen(self):
-        # 1. Carrega as imagens para mostrar no menu (apenas para visualização)
-        # Certifique-se de ter os arquivos 'aluno_1.png' e 'aluno_2.png' na pasta assets/img
-        img_p1 = pygame.image.load("assets/img/aluno_1.png").convert_alpha()
-        img_p1 = pygame.transform.scale(img_p1, (100, 100)) # Aumentei pra ficar bonito no menu
+        try:
+            # Carrega usando os nomes EXATOS da sua pasta
+            img_p1 = pygame.image.load("assets/img/aluno1frente.png").convert_alpha()
+            img_p1 = pygame.transform.scale(img_p1, (100, 100))
 
-        img_p2 = pygame.image.load("assets/img/aluno_2.png").convert_alpha()
-        img_p2 = pygame.transform.scale(img_p2, (100, 100))
+            img_p2 = pygame.image.load("assets/img/aluno2frente.png").convert_alpha()
+            img_p2 = pygame.transform.scale(img_p2, (100, 100))
+        except Exception as e:
+            print(f"Erro no menu: {e}")
+            sys.exit()
 
-        # Variável para saber qual está selecionado (0 = Esquerda, 1 = Direita)
         selection_index = 0 
-        
         waiting = True
         while waiting:
             self.clock.tick(FPS)
-            
-            # --- Eventos do Menu ---
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     self.running = False
                     waiting = False
-                
                 if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_LEFT:
-                        selection_index = 0 # Seleciona o primeiro
-                    elif event.key == pygame.K_RIGHT:
-                        selection_index = 1 # Seleciona o segundo
-                    elif event.key == pygame.K_RETURN: # Enter confirma
+                    if event.key == pygame.K_LEFT or event.key == pygame.K_a:
+                        selection_index = 0
+                    elif event.key == pygame.K_RIGHT or event.key == pygame.K_d:
+                        selection_index = 1
+                    elif event.key == pygame.K_RETURN:
                         waiting = False
 
-            # --- Desenho do Menu ---
-            self.screen.fill(WHITE) # Ou a cor de fundo que preferir
-            
-            self.draw_text("UFPE ROAD", self.title_font, BLACK, SCREEN_WIDTH/2, 100)
-            self.draw_text("Escolha seu personagem:", self.font, BLACK, SCREEN_WIDTH/2, 200)
-            self.draw_text("Use SETAS para escolher e ENTER para confirmar", self.font, BLACK, SCREEN_WIDTH/2, 550)
+            self.screen.fill(WHITE)
+            self.draw_text("CIn Road", self.title_font, BLACK, SCREEN_WIDTH/2, 100)
+            self.draw_text("Escolha o Personagem:", self.font, BLACK, SCREEN_WIDTH/2, 200)
 
-            # Posições dos desenhos
             x1, y1 = SCREEN_WIDTH/2 - 150, 300
             x2, y2 = SCREEN_WIDTH/2 + 50, 300
 
-            # Desenha os bonecos
             self.screen.blit(img_p1, (x1, y1))
             self.screen.blit(img_p2, (x2, y2))
 
-            # Desenha um quadrado em volta do escolhido (Destaque)
             if selection_index == 0:
-                pygame.draw.rect(self.screen, (255, 0, 0), (x1-5, y1-5, 110, 110), 3) # Retângulo Vermelho no P1
-                self.selected_skin = "aluno_1.png" # Salva o nome do arquivo escolhido
+                pygame.draw.rect(self.screen, (255, 0, 0), (x1-5, y1-5, 110, 110), 3)
+                # Passamos o nome completo do arquivo inicial
+                self.selected_skin = "aluno1frente.png"
             else:
-                pygame.draw.rect(self.screen, (255, 0, 0), (x2-5, y2-5, 110, 110), 3) # Retângulo Vermelho no P2
-                self.selected_skin = "aluno_2.png" # Salva o nome do arquivo escolhido
+                pygame.draw.rect(self.screen, (255, 0, 0), (x2-5, y2-5, 110, 110), 3)
+                self.selected_skin = "aluno2frente.png"
 
             pygame.display.flip()
 
