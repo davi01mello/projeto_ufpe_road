@@ -3,11 +3,11 @@ from src.config import BLOCK_SIZE, SCREEN_WIDTH, SCREEN_HEIGHT
 from src.entities.entity_base import Entity
 
 class Player(Entity):
-    def __init__(self, start_grid_x, start_grid_y):
+    def __init__(self, start_grid_x, start_grid_y, image_name): 
         x_pixel = start_grid_x * BLOCK_SIZE
         y_pixel = start_grid_y * BLOCK_SIZE
         
-        super().__init__(x_pixel, y_pixel, BLOCK_SIZE, BLOCK_SIZE, (0, 0, 255), "aluno.png")
+        super().__init__(x_pixel, y_pixel, BLOCK_SIZE, BLOCK_SIZE, (0, 0, 255), image_name)
         
         # Guarda a imagem original para poder desvirar
         self.original_image = self.image 
