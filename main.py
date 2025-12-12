@@ -26,13 +26,10 @@ VICTORY = 3
 class Game:
     def __init__(self):
         pygame.init()
-        
-        # SOM
         try:
             pygame.mixer.init()
             self.sound_enabled = True
-        except Exception as e:
-            print(f"ERRO DE SOM: {e}")
+        except:
             self.sound_enabled = False
 
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
@@ -41,30 +38,26 @@ class Game:
         
         self.font = pygame.font.SysFont("Arial", 24)
         self.title_font = pygame.font.SysFont("Arial", 48, bold=True)
-        self.alert_font = pygame.font.SysFont("Arial", 36, bold=True) # Fonte para o aviso MOVA-SE
+        self.alert_font = pygame.font.SysFont("Arial", 36, bold=True)
         
         self.state = START
         self.running = True
 
-        # CARREGA SONS
+        # SONS
         self.sounds = {}
         if self.sound_enabled:
             try:
                 pygame.mixer.music.load("assets/sounds/musica.mp3")
                 pygame.mixer.music.set_volume(0.4) 
-                
                 self.sounds["jump"] = pygame.mixer.Sound("assets/sounds/pulo.wav")
                 self.sounds["hit"] = pygame.mixer.Sound("assets/sounds/dano.wav")
                 self.sounds["collect"] = pygame.mixer.Sound("assets/sounds/item.wav")
                 self.sounds["game_over"] = pygame.mixer.Sound("assets/sounds/game_over.wav")
                 self.sounds["win"] = pygame.mixer.Sound("assets/sounds/vitoria.wav")
                 self.sounds["turbo"] = pygame.mixer.Sound("assets/sounds/item.wav")
-                
                 if "jump" in self.sounds: self.sounds["jump"].set_volume(0.3)
-            except Exception as e:
-                print(f"AVISO SONORO: Arquivos faltando. {e}")
+            except: pass
 
-        # MAPA
         self.map_layout = self.generate_map_layout()
 
     def play_sound(self, name):
@@ -86,7 +79,6 @@ class Game:
         
         for i in range(1, 8):
             layout[-i] = ROW_GRASS
-            
         return layout
 
     def new_game(self):
@@ -96,7 +88,6 @@ class Game:
 
         start_x = GRID_WIDTH // 2
         start_y = GRID_HEIGHT - 2
-        
         skin = getattr(self, 'selected_skin', "aluno1frente.png")
         self.player = Player(start_x, start_y, skin) 
         self.all_sprites.add(self.player)
@@ -106,27 +97,24 @@ class Game:
         self.distance_traveled = 0 
         self.turbo_active = False
         self.turbo_timer = 0
-        
-        # MUDANÇA 3: Variável para controlar o tempo parado
         self.idle_frames = 0 
         
-        self.scroll_offset_y = 0
-
+        # MUDANÇA: Dicionário para controlar o tempo de spawn de cada rua
+        # Chave: Índice da Linha (int) -> Valor: Timer (int)
+        self.lane_timers = {} 
+        
         if self.sound_enabled:
             try: pygame.mixer.music.play(-1)
             except: pass
 
     def start_turbo(self):
         self.turbo_active = True
-        # MUDANÇA 2: Tempo reduzido para 60 frames (1 segundo)
         self.turbo_timer = 60 
         self.play_sound("turbo")
-        # Reseta o contador de inatividade quando ativa turbo
         self.idle_frames = 0 
 
     def scroll_world(self):
         self.distance_traveled += 1
-        # Se o mundo andou, o jogador não está parado
         self.idle_frames = 0 
         
         for sprite in self.all_sprites:
@@ -137,9 +125,10 @@ class Game:
                 if sprite.rect.top > SCREEN_HEIGHT:
                     sprite.kill()
 
-        self.spawn_on_horizon()
+        self.spawn_static_objects()
 
-    def spawn_on_horizon(self):
+    def spawn_static_objects(self):
+        """Gera apenas itens e obras (coisas que não andam)"""
         rows_remaining = len(self.map_layout) - 1 - self.distance_traveled
         rows_on_screen = SCREEN_HEIGHT // BLOCK_SIZE
         target_row_index = int(rows_remaining - rows_on_screen)
@@ -148,30 +137,68 @@ class Game:
         
         row_type = self.map_layout[target_row_index]
 
-        if row_type == ROW_ROAD:
-            if random.random() < 0.6: 
-                progress = self.distance_traveled / GOAL_DISTANCE
-                dificuldade = 1.0 + (progress * 1.5) 
-                obs = Obstacle(random.choice(["carro", "carro", "circular"]), speed_multiplier=dificuldade)
-                obs.rect.y = -BLOCK_SIZE 
-                self.all_sprites.add(obs)
-                self.obstacles.add(obs)
-        
-        elif row_type == ROW_GRASS:
+        if row_type == ROW_GRASS:
             if random.random() < 0.5:
                 if random.random() < 0.3:
-                    obs = Obstacle("obra") 
-                    obs.rect.y = -BLOCK_SIZE
+                    obs = Obstacle("obra", fixed_y=-BLOCK_SIZE)
                     self.all_sprites.add(obs)
                     self.obstacles.add(obs)
                 else:
-                    # MUDANÇA 1: Aumentado peso do BadgeFragment para 80% (era 60)
-                    # Badge: 80, Drink: 10, Shield: 10
                     item_class = random.choices([BadgeFragment, EnergyDrink, Shield], weights=[80, 10, 10], k=1)[0]
                     item = item_class()
                     item.rect.y = -BLOCK_SIZE 
                     self.all_sprites.add(item)
                     self.items.add(item)
+
+    def manage_traffic(self):
+        """
+        Gera tráfego contínuo com espaçamento entre carros.
+        """
+        rows_on_screen = SCREEN_HEIGHT // BLOCK_SIZE
+        bottom_row_logical_index = len(self.map_layout) - 1 - self.distance_traveled
+        
+        # Percorre as linhas visíveis
+        for i in range(rows_on_screen + 2):
+            screen_y = SCREEN_HEIGHT - ((i + 1) * BLOCK_SIZE)
+            logical_index = int(bottom_row_logical_index - i)
+            
+            if logical_index < 0: continue
+            
+            # Se for RUA
+            if self.map_layout[logical_index] == ROW_ROAD:
+                
+                # 1. Verifica/Atualiza o Timer dessa rua específica
+                if logical_index not in self.lane_timers:
+                    self.lane_timers[logical_index] = 0
+                
+                # Se o timer ainda está contando, diminui e PULA essa rua (não cria carro)
+                if self.lane_timers[logical_index] > 0:
+                    self.lane_timers[logical_index] -= 1
+                    continue 
+
+                # 2. Se o timer zerou, tenta criar um carro
+                # Chance alta (5%) porque o timer já controla o fluxo
+                if random.random() < 0.05:
+                    
+                    direction = "left" if logical_index % 2 == 0 else "right"
+                    
+                    progress = self.distance_traveled / GOAL_DISTANCE
+                    dificuldade = 1.0 + (progress * 1.5)
+
+                    obs = Obstacle(
+                        random.choice(["carro", "carro", "circular"]), 
+                        speed_multiplier=dificuldade,
+                        fixed_y=screen_y,
+                        fixed_direction=direction
+                    )
+                    
+                    self.all_sprites.add(obs)
+                    self.obstacles.add(obs)
+                    
+                    # 3. DEFINE O ESPAÇAMENTO PARA O PRÓXIMO CARRO
+                    # Gera um número entre 90 e 200 frames (1.5s a 3.5s de intervalo)
+                    # Isso garante que nunca venha um carro colado no outro
+                    self.lane_timers[logical_index] = random.randint(90, 200)
 
     def spawn_entities(self):
         pass
@@ -235,11 +262,8 @@ class Game:
                 elif event.key == pygame.K_DOWN or event.key == pygame.K_s:
                     self.player.move(0, 1) 
                 
-                # CIMA (Avançar)
                 elif event.key == pygame.K_UP or event.key == pygame.K_w:
-                    # MUDANÇA 3: Se apertou pra cima, zera o timer de inatividade
                     self.idle_frames = 0 
-                    
                     if self.player.grid_y < 4:
                         self.scroll_world() 
                         self.player.update_sprite("back")
@@ -281,7 +305,6 @@ class Game:
         rect.midtop = (x, y)
         self.screen.blit(img, rect)
 
-    # ... (show_start_screen mantido igual) ...
     def show_start_screen(self):
         try:
             img_p1 = pygame.image.load("assets/img/aluno1frente.png").convert_alpha()
@@ -339,8 +362,7 @@ class Game:
 
     def show_game_over_screen(self):
         self.screen.fill(BLACK)
-        # Verifica se morreu por tempo (camping)
-        if self.idle_frames >= 5 * FPS:
+        if self.idle_frames >= 5 * 60:
             motivo = "Você ficou parado muito tempo!"
         elif self.score < REQUIRED_BADGES and self.distance_traveled >= GOAL_DISTANCE:
             motivo = f"Faltaram crachás! {self.score}/{REQUIRED_BADGES}"
@@ -374,29 +396,22 @@ class Game:
                     waiting = False
 
     def update(self):
-        # MUDANÇA 3: Lógica Anti-Camping
-        # Se não estiver em turbo e não estiver andando...
         if not self.turbo_active:
             self.idle_frames += 1
-            
-            # 5 segundos (60 FPS * 5) = Game Over
             if self.idle_frames >= 5 * 60:
-                print("Morreu por ficar parado!")
                 if self.sound_enabled: pygame.mixer.music.stop()
                 self.play_sound("game_over")
                 self.state = GAME_OVER
         
-        # Lógica Turbo
         if self.turbo_active:
             self.turbo_timer -= 1
-            # Acelera: Rola o mundo a cada 2 frames (muito rápido)
             if self.turbo_timer % 2 == 0:
                 self.scroll_world()
             if self.turbo_timer <= 0:
                 self.turbo_active = False
-
+        
+        self.manage_traffic()
         self.all_sprites.update()
-        self.spawn_entities()
         self.check_collisions()
 
     def draw(self):
@@ -408,8 +423,6 @@ class Game:
 
         if self.turbo_active:
             self.draw_text("!!! TURBO !!!", self.title_font, (255, 165, 0), SCREEN_WIDTH/2, 100)
-        
-        # MUDANÇA 3: Aviso visual de "MOVA-SE" (3 segundos parado)
         elif self.idle_frames > 3 * 60:
             self.draw_text("MOVA-SE!", self.alert_font, (255, 0, 0), SCREEN_WIDTH/2, 100)
 

@@ -4,10 +4,18 @@ from src.config import SCREEN_WIDTH, SCREEN_HEIGHT
 from src.entities.entity_base import Entity
 
 class Obstacle(Entity):
-    def __init__(self, type_name="carro", speed_multiplier=1.0):
-        side = random.choice(["left", "right"])
-        lane_y = random.randint(1, 10) * 50 
+    def __init__(self, type_name="carro", speed_multiplier=1.0, fixed_y=None, fixed_direction=None):
+        """
+        fixed_y: Se informado, força o obstáculo a nascer nessa altura.
+        fixed_direction: "left" ou "right". Se informado, força a direção.
+        """
+        # Define Y (Aleatório ou Fixo)
+        if fixed_y is not None:
+            lane_y = fixed_y
+        else:
+            lane_y = random.randint(1, 10) * 50 
         
+        # Define Tipo e Imagem
         if type_name == "circular":
             base_speed = random.randint(7, 10)
             img = "onibus.png"
@@ -16,30 +24,41 @@ class Obstacle(Entity):
             base_speed = 0
             img = "cone.png"
             w, h = 40, 40
-            start_x = random.randint(50, SCREEN_WIDTH - 50)
-            side = "middle" 
+            side = "middle" # Obra é parada
         else: # Carro normal
             base_speed = random.randint(3, 6)
             img = "carro.png"
             w, h = 80, 50
 
-        # Aplica o multiplicador de dificuldade na velocidade base
-        final_speed = base_speed * speed_multiplier
-
-        if side == "left":
-            start_x = -100
-            speed = final_speed
-        elif side == "right":
-            start_x = SCREEN_WIDTH + 100
-            speed = -final_speed
-        elif side == "middle":
+        # Define Direção e X inicial
+        # Se for "obra", ignora direção (fica parado)
+        if type_name == "obra":
             speed = 0
-            start_x = random.randint(0, SCREEN_WIDTH)
+            start_x = random.randint(50, SCREEN_WIDTH - 50)
+        else:
+            # Se não passamos direção fixa, escolhe aleatória
+            if fixed_direction:
+                side = fixed_direction
+            else:
+                side = random.choice(["left", "right"])
+
+            # Aplica velocidade e posição X fora da tela
+            final_speed = base_speed * speed_multiplier
+            
+            if side == "left":
+                # Nasce na direita, vai para esquerda (velocidade negativa)
+                start_x = SCREEN_WIDTH + 50
+                speed = -final_speed 
+            else:
+                # Nasce na esquerda, vai para direita (velocidade positiva)
+                start_x = -50 
+                speed = final_speed
 
         super().__init__(start_x, lane_y, w, h, (255, 0, 0), img)
         
         self.original_speed = speed
         
+        # Vira a imagem se estiver indo para a direita
         if speed > 0 and self.image and type_name != "obra":
              self.image = pygame.transform.flip(self.image, True, False)
 
@@ -47,5 +66,22 @@ class Obstacle(Entity):
         current_speed = self.original_speed * 0.5 if slow_motion_active else self.original_speed
         self.rect.x += current_speed
 
+        # Mata o sprite se sair muito da tela
         if self.rect.right < -150 or self.rect.left > SCREEN_WIDTH + 150:
             self.kill()
+
+# Classe Deadline continua igual
+class Deadline(Entity):
+    def __init__(self):
+        super().__init__(0, SCREEN_HEIGHT + 50, SCREEN_WIDTH, 50, (0, 0, 0), "deadline.png")
+        self.image = pygame.Surface((SCREEN_WIDTH, 50))
+        self.image.set_alpha(150)
+        self.image.fill((0, 0, 0))
+        self.rect = self.image.get_rect()
+        self.rect.x = 0
+        self.rect.y = SCREEN_HEIGHT + 50
+        self.speed = 0.5
+
+    def update(self, scroll_y=0):
+        self.rect.y -= self.speed
+        self.rect.y += scroll_y
