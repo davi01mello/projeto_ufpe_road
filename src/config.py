@@ -1,10 +1,27 @@
+# src/config.py
 import pygame
 
-LARGURA_TELA = 800
-ALTURA_TELA = 600
-TITULO_JOGO = "UFPE Road: O Desafio do Campus"
+# Configurações da Tela
+SCREEN_WIDTH = 800
+SCREEN_HEIGHT = 600
+TITLE = "CIn Road: Rumo ao Diploma"
+
+# Configurações da Grade (Grid)
+# O tamanho do "pulo". 40x40 ou 50x50 costuma ser bom.
+BLOCK_SIZE = 50 
+GRID_WIDTH = SCREEN_WIDTH // BLOCK_SIZE
+GRID_HEIGHT = SCREEN_HEIGHT // BLOCK_SIZE
+
+# Cores (R, G, B)
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+GREEN = (34, 139, 34) # Cor da grama (provisório)
+BLUE = (0, 0, 255)    # Cor do Player (provisório)
+
+# FPS
 FPS = 60
-BRANCO = (255, 255, 255)
-PRETO = (0, 0, 0)
-AZUL_UFPE = (0, 50, 100) # Cor do Jogador por enquanto
-VERMELHO = (200, 0, 0)   # Cor dos Inimigos
+# Adicione no final do arquivo src/config.py
+
+# Meta: Quantos "passos" de grid até o CIn?
+# 50 passos * 50 pixels = mapa de 2500 pixels de altura
+GOAL_DISTANCE = 50
