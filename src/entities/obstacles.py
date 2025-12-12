@@ -49,3 +49,30 @@ class Obstacle(Entity):
 
         if self.rect.right < -150 or self.rect.left > SCREEN_WIDTH + 150:
             self.kill()
+            # Adicione isso no final do arquivo src/entities/obstacles.py
+
+class Deadline(Entity):
+    def __init__(self):
+        # Começa 100 pixels ABAIXO da tela (escondido)
+        # Largura total da tela, altura de 50px
+        super().__init__(0, SCREEN_HEIGHT + 50, SCREEN_WIDTH, 50, (0, 0, 0), "deadline.png")
+        
+        # Cria uma superfície semitransparente (Sombra escura)
+        # Se não tiver imagem, vai ser um retangulo preto meio transparente
+        self.image = pygame.Surface((SCREEN_WIDTH, 50))
+        self.image.set_alpha(150) # Transparência (0-255)
+        self.image.fill((0, 0, 0)) # Cor preta (Sombra)
+        self.rect = self.image.get_rect()
+        
+        self.rect.x = 0
+        self.rect.y = SCREEN_HEIGHT + 50
+        
+        self.speed = 0.5 # Velocidade que ele sobe (ajuste se ficar muito difícil)
+
+    def update(self, scroll_y=0):
+        # Ele sobe constantemente (diminui Y)
+        self.rect.y -= self.speed
+        
+        # Se o mundo desceu (jogador avançou), o Deadline é empurrado pra baixo também
+        # Isso dá um alívio para o jogador que está correndo
+        self.rect.y += scroll_y

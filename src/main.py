@@ -2,12 +2,14 @@ import pygame
 import sys
 import random
 
+# Importa as configurações e as classes
 from src.config import *
 from src.entities.player import Player
-from src.entities.obstacles import Obstacle
+# Importa Obstacle E Deadline
+from src.entities.obstacles import Obstacle, Deadline 
 from src.entities.collectibles import BadgeFragment, EnergyDrink, Shield
 
-# Estados
+# Estados do Jogo
 START = 0
 PLAYING = 1
 GAME_OVER = 2
@@ -20,6 +22,7 @@ class Game:
         pygame.display.set_caption("CIn Road: Rumo ao Diploma")
         self.clock = pygame.time.Clock()
         
+        # Fontes
         self.font = pygame.font.SysFont("Arial", 24)
         self.title_font = pygame.font.SysFont("Arial", 48, bold=True)
         
@@ -27,55 +30,57 @@ class Game:
         self.running = True
 
     def new_game(self):
+        """Reinicia variáveis para uma nova partida"""
         self.all_sprites = pygame.sprite.Group()
         self.obstacles = pygame.sprite.Group()
         self.items = pygame.sprite.Group()
 
-        # Jogador começa lá embaixo
+        # Cria o Jogador
         start_x = GRID_WIDTH // 2
         start_y = GRID_HEIGHT - 2
         self.player = Player(start_x, start_y)
         self.all_sprites.add(self.player)
+        
+        # Cria o Deadline (Inimigo de trás)
+        self.deadline = Deadline()
+        self.all_sprites.add(self.deadline)
 
         self.spawn_timer = 0
         self.score = 0
-        
-        # NOVO: Contador de progresso
-        self.distance_traveled = 0 
+        self.distance_traveled = 0
 
     def scroll_world(self):
-        """
-        NOVO: Move o mundo para baixo para simular a câmera subindo.
-        """
+        """Move o mundo para baixo (ilusão de subir)"""
         self.distance_traveled += 1
         
-        # 1. Move tudo que NÃO é o player para baixo
+        # 1. Move tudo que NÃO é o player e NÃO é o deadline (ele tem lógica própria)
         for sprite in self.all_sprites:
-            if sprite != self.player:
+            if sprite != self.player and sprite != self.deadline:
                 sprite.rect.y += BLOCK_SIZE
-                # Se tiver atributo de grid, atualiza também (para lógica futura)
                 if hasattr(sprite, 'grid_y'):
                     sprite.grid_y += 1
-
-                # Se sair da tela por baixo, remove para economizar memória
+                
+                # Remove sprites que saíram da tela por baixo
                 if sprite.rect.top > SCREEN_HEIGHT:
                     sprite.kill()
 
-        # 2. Gera novos obstáculos no TOPO da tela (Horizonte)
+        # 2. Empurra o Deadline pra baixo também (dá uma folga pro jogador)
+        self.deadline.rect.y += BLOCK_SIZE 
+
+        # 3. Gera novos obstáculos no horizonte
         self.spawn_on_horizon()
 
     def spawn_on_horizon(self):
-        """NOVO: Cria inimigos com dificuldade progressiva"""
+        """Cria inimigos com dificuldade progressiva no topo"""
         if random.random() < 0.6: 
             if random.random() < 0.7:
                 # --- CALCULA DIFICULDADE ---
-                # Começa em 1.0 e vai até 2.0 (dobro da velocidade) quando chegar perto da meta
+                # Vai de 1.0 (normal) até 2.0 (dobro da velocidade)
                 progress = self.distance_traveled / GOAL_DISTANCE
-                dificuldade = 1.0 + (progress * 1.0) # Máximo 2.0x
+                if progress > 1: progress = 1 # Trava em 100%
+                dificuldade = 1.0 + (progress * 1.0) 
                 
-                # Passa a dificuldade para o obstáculo
                 obs = Obstacle(random.choice(["carro", "carro", "circular", "obra"]), speed_multiplier=dificuldade)
-                
                 obs.rect.y = -BLOCK_SIZE 
                 self.all_sprites.add(obs)
                 self.obstacles.add(obs)
@@ -85,24 +90,30 @@ class Game:
                 item.rect.y = -BLOCK_SIZE 
                 self.all_sprites.add(item)
                 self.items.add(item)
+
     def spawn_entities(self):
-        """
-        Mantemos esse spawn aleatório APENAS para preencher buracos,
-        mas com menor frequência, já que o scroll_world gera o mapa principal.
-        """
+        """Spawn aleatório secundário (menos frequente)"""
         self.spawn_timer += 1
-        if self.spawn_timer >= 60: # Mais lento agora
+        if self.spawn_timer >= 60: 
             self.spawn_timer = 0
-            # Código de spawn aleatório (opcional manter)
+            # Pode deixar vazio ou colocar lógica simples se quiser encher buracos
             pass
 
     def check_collisions(self):
-        # 1. NOVO: Vitória baseada na Distância, não na posição Y
+        """Lógica de Colisões, Vitória e Derrota"""
+        
+        # 1. Vitória por Distância
         if self.distance_traveled >= GOAL_DISTANCE:
             self.state = VICTORY
             return
 
-        # 2. Colisão Obstáculos
+        # 2. Game Over pelo Deadline (Sombra)
+        if pygame.sprite.collide_rect(self.player, self.deadline):
+            print("👻 O Deadline te pegou!")
+            self.state = GAME_OVER
+            return
+
+        # 3. Colisão com Obstáculos
         hit_obstacle = pygame.sprite.spritecollideany(self.player, self.obstacles)
         if hit_obstacle:
             tomou_dano = self.player.check_damage()
@@ -110,12 +121,13 @@ class Game:
 
             if tomou_dano:
                 if self.player.lives > 0:
-                    # Se tomou dano, recua um pouco o progresso ou só reseta posição
                     self.player.reset_position()
+                    # Recua o deadline um pouco para não morrer instantâneo no respawn
+                    self.deadline.rect.y += 200 
                 else:
                     self.state = GAME_OVER
 
-        # 3. Colisão Itens
+        # 4. Colisão com Itens
         collected_item = pygame.sprite.spritecollideany(self.player, self.items)
         if collected_item:
             if isinstance(collected_item, BadgeFragment):
@@ -123,10 +135,9 @@ class Game:
             elif isinstance(collected_item, Shield):
                 self.player.has_shield = True
             elif isinstance(collected_item, EnergyDrink):
-                pass
+                pass # Futuro power-up
             collected_item.kill()
 
-    # --- INPUTS COM LÓGICA DE SCROLL ---
     def handle_events(self):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -138,29 +149,26 @@ class Game:
                 elif event.key == pygame.K_RIGHT:
                     self.player.move(1, 0)
                 elif event.key == pygame.K_DOWN:
-                    self.player.move(0, 1) # Pode descer na tela
+                    self.player.move(0, 1)
                 
                 elif event.key == pygame.K_UP:
-                    # NOVO: Lógica da Esteira
-                    # Se o player estiver acima da linha 4 (topo da tela)
+                    # Lógica da Esteira
                     if self.player.grid_y < 4:
-                        self.scroll_world() # O Player fica, o mundo desce
+                        self.scroll_world() 
                     else:
-                        self.player.move(0, -1) # O Player sobe na tela
+                        self.player.move(0, -1)
 
-    # ... RESTO DO CÓDIGO (draw_text, Telas, Run, Update, Draw) IGUAL AO ANTERIOR ...
-    # Copie as funções draw_text, show_start_screen, etc. do código anterior ou mantenha
-    
     def draw_text(self, text, font, color, x, y):
         img = font.render(text, True, color)
         rect = img.get_rect()
         rect.midtop = (x, y)
         self.screen.blit(img, rect)
 
+    # --- TELAS ---
     def show_start_screen(self):
         self.screen.fill(WHITE)
         self.draw_text("CIn ROAD", self.title_font, BLACK, SCREEN_WIDTH/2, SCREEN_HEIGHT/4)
-        self.draw_text(f"Meta: {GOAL_DISTANCE} passos até o CIn", self.font, BLACK, SCREEN_WIDTH/2, SCREEN_HEIGHT/2)
+        self.draw_text(f"Fuja do Deadline! Meta: {GOAL_DISTANCE}m", self.font, BLACK, SCREEN_WIDTH/2, SCREEN_HEIGHT/2)
         self.draw_text("Pressione QUALQUER TECLA", self.font, BLACK, SCREEN_WIDTH/2, SCREEN_HEIGHT * 3/4)
         pygame.display.flip()
         self.wait_for_key()
@@ -169,7 +177,7 @@ class Game:
         self.screen.fill(BLACK)
         self.draw_text("GAME OVER", self.title_font, (255, 0, 0), SCREEN_WIDTH/2, SCREEN_HEIGHT/4)
         self.draw_text(f"Pontuação: {self.score}", self.font, WHITE, SCREEN_WIDTH/2, SCREEN_HEIGHT/2)
-        self.draw_text("Tecla para reiniciar", self.font, WHITE, SCREEN_WIDTH/2, SCREEN_HEIGHT * 3/4)
+        self.draw_text("Pressione TECLA para reiniciar", self.font, WHITE, SCREEN_WIDTH/2, SCREEN_HEIGHT * 3/4)
         pygame.display.flip()
         self.wait_for_key()
 
@@ -177,14 +185,14 @@ class Game:
         self.screen.fill(WHITE)
         self.draw_text("CHEGOU AO CIn!", self.title_font, (0, 0, 255), SCREEN_WIDTH/2, SCREEN_HEIGHT/4)
         self.draw_text(f"Crachás: {self.score}", self.font, BLACK, SCREEN_WIDTH/2, SCREEN_HEIGHT/2)
-        self.draw_text("Tecla para reiniciar", self.font, BLACK, SCREEN_WIDTH/2, SCREEN_HEIGHT * 3/4)
+        self.draw_text("Pressione TECLA para reiniciar", self.font, BLACK, SCREEN_WIDTH/2, SCREEN_HEIGHT * 3/4)
         pygame.display.flip()
         self.wait_for_key()
 
     def wait_for_key(self):
         waiting = True
         while waiting:
-            self.clock.tick(60)
+            self.clock.tick(FPS)
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     waiting = False
@@ -205,14 +213,17 @@ class Game:
         
         self.all_sprites.draw(self.screen)
         
-        # HUD NOVO: Barra de Progresso ou Texto de Distância
+        # Aviso de Perigo (Deadline visível)
+        if self.deadline.rect.top < SCREEN_HEIGHT:
+             self.draw_text("CORRA! O DEADLINE VEM AÍ!", self.font, (255, 0, 0), SCREEN_WIDTH/2, SCREEN_HEIGHT - 100)
+        
+        # HUD
         escudo_txt = "SIM" if self.player.has_shield else "NÃO"
         cor_escudo = (0, 200, 0) if self.player.has_shield else BLACK
 
         self.draw_text(f"Vidas: {self.player.lives}", self.font, BLACK, 60, 10)
         self.draw_text(f"Escudo: {escudo_txt}", self.font, cor_escudo, 200, 10)
         
-        # Mostra quanto falta para chegar
         distancia_restante = GOAL_DISTANCE - self.distance_traveled
         if distancia_restante < 0: distancia_restante = 0
         self.draw_text(f"Faltam: {distancia_restante}m", self.font, (0, 0, 255), SCREEN_WIDTH/2, 10)
@@ -234,7 +245,7 @@ class Game:
                 self.show_victory_screen()
                 self.state = START
             elif self.state == PLAYING:
-                self.handle_events() # Inputs mudaram para handle_events no loop
+                self.handle_events()
                 self.update()
                 self.draw()
                 self.clock.tick(FPS)
