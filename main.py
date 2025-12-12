@@ -16,6 +16,15 @@ VICTORY = 3
 class Game:
     def __init__(self):
         pygame.init()
+        
+        # --- 1. INICIALIZA O SISTEMA DE SOM ---
+        try:
+            pygame.mixer.init()
+            self.sound_enabled = True
+        except Exception as e:
+            print(f"Aviso: Não foi possível iniciar o som. {e}")
+            self.sound_enabled = False
+
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
         pygame.display.set_caption("CIn Road: Rumo ao Diploma")
         self.clock = pygame.time.Clock()
@@ -26,6 +35,31 @@ class Game:
         self.state = START
         self.running = True
 
+        # --- 2. CARREGA OS SONS ---
+        self.sounds = {}
+        if self.sound_enabled:
+            try:
+                # Música de Fundo (ajuste o volume: 0.0 a 1.0)
+                pygame.mixer.music.load("assets/sounds/musica.mp3")
+                pygame.mixer.music.set_volume(0.4) 
+                
+                # Efeitos Sonoros (SFX)
+                self.sounds["jump"] = pygame.mixer.Sound("assets/sounds/pulo.wav")
+                self.sounds["hit"] = pygame.mixer.Sound("assets/sounds/dano.wav")
+                self.sounds["collect"] = pygame.mixer.Sound("assets/sounds/item.wav")
+                self.sounds["game_over"] = pygame.mixer.Sound("assets/sounds/game_over.wav")
+                self.sounds["win"] = pygame.mixer.Sound("assets/sounds/vitoria.wav")
+                
+                # Ajuste opcional de volumes individuais
+                if "jump" in self.sounds: self.sounds["jump"].set_volume(0.3)
+            except Exception as e:
+                print(f"⚠️ Aviso: Arquivos de som faltando em 'assets/sounds/'. O jogo ficará mudo. Erro: {e}")
+
+    def play_sound(self, name):
+        """Função auxiliar para tocar sons sem quebrar o jogo se faltar arquivo"""
+        if self.sound_enabled and name in self.sounds:
+            self.sounds[name].play()
+
     def new_game(self):
         self.all_sprites = pygame.sprite.Group()
         self.obstacles = pygame.sprite.Group()
@@ -35,51 +69,46 @@ class Game:
         start_x = GRID_WIDTH // 2
         start_y = GRID_HEIGHT - 2
         
-        # AQUI ESTÁ A MUDANÇA MÁGICA:
-        # Passamos self.selected_skin que definimos na tela inicial
+        # Cria o Player com a Skin Escolhida
         self.player = Player(start_x, start_y, self.selected_skin) 
-        
         self.all_sprites.add(self.player)
 
         self.spawn_timer = 0
         self.score = 0
-        
-        # NOVO: Contador de progresso
         self.distance_traveled = 0 
 
+        # Toca a música em loop (-1) ao iniciar o jogo
+        if self.sound_enabled:
+            try: 
+                pygame.mixer.music.play(-1)
+            except: 
+                pass
+
     def scroll_world(self):
-        """
-        NOVO: Move o mundo para baixo para simular a câmera subindo.
-        """
+        """Move o mundo para baixo para simular a câmera subindo."""
         self.distance_traveled += 1
         
         # 1. Move tudo que NÃO é o player para baixo
         for sprite in self.all_sprites:
             if sprite != self.player:
                 sprite.rect.y += BLOCK_SIZE
-                # Se tiver atributo de grid, atualiza também (para lógica futura)
                 if hasattr(sprite, 'grid_y'):
                     sprite.grid_y += 1
-
-                # Se sair da tela por baixo, remove para economizar memória
                 if sprite.rect.top > SCREEN_HEIGHT:
                     sprite.kill()
 
-        # 2. Gera novos obstáculos no TOPO da tela (Horizonte)
+        # 2. Gera novos obstáculos no TOPO da tela
         self.spawn_on_horizon()
 
     def spawn_on_horizon(self):
-        """NOVO: Cria inimigos com dificuldade progressiva"""
+        """Cria inimigos com dificuldade progressiva"""
         if random.random() < 0.6: 
             if random.random() < 0.7:
-                # --- CALCULA DIFICULDADE ---
-                # Começa em 1.0 e vai até 2.0 (dobro da velocidade) quando chegar perto da meta
+                # Dificuldade progressiva
                 progress = self.distance_traveled / GOAL_DISTANCE
-                dificuldade = 1.0 + (progress * 1.0) # Máximo 2.0x
+                dificuldade = 1.0 + (progress * 1.0) 
                 
-                # Passa a dificuldade para o obstáculo
                 obs = Obstacle(random.choice(["carro", "carro", "circular", "obra"]), speed_multiplier=dificuldade)
-                
                 obs.rect.y = -BLOCK_SIZE 
                 self.all_sprites.add(obs)
                 self.obstacles.add(obs)
@@ -89,39 +118,42 @@ class Game:
                 item.rect.y = -BLOCK_SIZE 
                 self.all_sprites.add(item)
                 self.items.add(item)
+
     def spawn_entities(self):
-        """
-        Mantemos esse spawn aleatório APENAS para preencher buracos,
-        mas com menor frequência, já que o scroll_world gera o mapa principal.
-        """
+        """Spawn aleatório secundário"""
         self.spawn_timer += 1
-        if self.spawn_timer >= 60: # Mais lento agora
+        if self.spawn_timer >= 60: 
             self.spawn_timer = 0
-            # Código de spawn aleatório (opcional manter)
             pass
 
     def check_collisions(self):
-        # 1. NOVO: Vitória baseada na Distância, não na posição Y
+        # 1. Vitória
         if self.distance_traveled >= GOAL_DISTANCE:
+            if self.sound_enabled: pygame.mixer.music.stop()
+            self.play_sound("win") # <--- SOM DE VITÓRIA
             self.state = VICTORY
             return
 
         # 2. Colisão Obstáculos
         hit_obstacle = pygame.sprite.spritecollideany(self.player, self.obstacles)
         if hit_obstacle:
+            self.play_sound("hit") # <--- SOM DE DANO
             tomou_dano = self.player.check_damage()
             hit_obstacle.kill()
 
             if tomou_dano:
                 if self.player.lives > 0:
-                    # Se tomou dano, recua um pouco o progresso ou só reseta posição
                     self.player.reset_position()
                 else:
+                    if self.sound_enabled: pygame.mixer.music.stop()
+                    self.play_sound("game_over") # <--- SOM DE GAME OVER
                     self.state = GAME_OVER
 
         # 3. Colisão Itens
         collected_item = pygame.sprite.spritecollideany(self.player, self.items)
         if collected_item:
+            self.play_sound("collect") # <--- SOM DE COLETA
+            
             if isinstance(collected_item, BadgeFragment):
                 self.score += 1 
             elif isinstance(collected_item, Shield):
@@ -130,39 +162,39 @@ class Game:
                 pass
             collected_item.kill()
 
-    # --- INPUTS COM LÓGICA DE SCROLL ---
+    # --- INPUTS ---
     def handle_events(self):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
             
             if event.type == pygame.KEYDOWN:
-                # --- ESQUERDA (Seta ou A) ---
+                
+                # Toca som se for tecla de movimento
+                if event.key in [pygame.K_LEFT, pygame.K_RIGHT, pygame.K_UP, pygame.K_DOWN, 
+                                 pygame.K_w, pygame.K_a, pygame.K_s, pygame.K_d]:
+                    self.play_sound("jump") # <--- SOM DE PULO
+
+                # --- ESQUERDA ---
                 if event.key == pygame.K_LEFT or event.key == pygame.K_a:
                     self.player.move(-1, 0)
 
-                # --- DIREITA (Seta ou D) ---
+                # --- DIREITA ---
                 elif event.key == pygame.K_RIGHT or event.key == pygame.K_d:
                     self.player.move(1, 0)
 
-                # --- BAIXO (Seta ou S) -> Olha para Frente ---
+                # --- BAIXO ---
                 elif event.key == pygame.K_DOWN or event.key == pygame.K_s:
                     self.player.move(0, 1) 
                 
-                # --- CIMA (Seta ou W) -> Olha para Costas ---
+                # --- CIMA ---
                 elif event.key == pygame.K_UP or event.key == pygame.K_w:
-                    # Lógica da Esteira (Scroll)
                     if self.player.grid_y < 4:
                         self.scroll_world() 
-                        # CORREÇÃO: Como o player não chama 'move',
-                        # forçamos a sprite de costas manualmente aqui:
                         self.player.update_sprite("back")
                     else:
                         self.player.move(0, -1)
 
-    # ... RESTO DO CÓDIGO (draw_text, Telas, Run, Update, Draw) IGUAL AO ANTERIOR ...
-    # Copie as funções draw_text, show_start_screen, etc. do código anterior ou mantenha
-    
     def draw_text(self, text, font, color, x, y):
         img = font.render(text, True, color)
         rect = img.get_rect()
@@ -171,7 +203,6 @@ class Game:
 
     def show_start_screen(self):
         try:
-            # Carrega usando os nomes EXATOS da sua pasta
             img_p1 = pygame.image.load("assets/img/aluno1frente.png").convert_alpha()
             img_p1 = pygame.transform.scale(img_p1, (100, 100))
 
@@ -183,6 +214,13 @@ class Game:
 
         selection_index = 0 
         waiting = True
+        
+        # Música do Menu (opcional, pode ser a mesma do jogo ou outra)
+        if self.sound_enabled:
+            if not pygame.mixer.music.get_busy():
+                try: pygame.mixer.music.play(-1)
+                except: pass
+
         while waiting:
             self.clock.tick(FPS)
             for event in pygame.event.get():
@@ -192,9 +230,12 @@ class Game:
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_LEFT or event.key == pygame.K_a:
                         selection_index = 0
+                        self.play_sound("jump") # Som ao trocar seleção
                     elif event.key == pygame.K_RIGHT or event.key == pygame.K_d:
                         selection_index = 1
+                        self.play_sound("jump")
                     elif event.key == pygame.K_RETURN:
+                        self.play_sound("collect") # Som de confirmar
                         waiting = False
 
             self.screen.fill(WHITE)
@@ -209,7 +250,6 @@ class Game:
 
             if selection_index == 0:
                 pygame.draw.rect(self.screen, (255, 0, 0), (x1-5, y1-5, 110, 110), 3)
-                # Passamos o nome completo do arquivo inicial
                 self.selected_skin = "aluno1frente.png"
             else:
                 pygame.draw.rect(self.screen, (255, 0, 0), (x2-5, y2-5, 110, 110), 3)
@@ -257,14 +297,13 @@ class Game:
         
         self.all_sprites.draw(self.screen)
         
-        # HUD NOVO: Barra de Progresso ou Texto de Distância
+        # HUD
         escudo_txt = "SIM" if self.player.has_shield else "NÃO"
         cor_escudo = (0, 200, 0) if self.player.has_shield else BLACK
 
         self.draw_text(f"Vidas: {self.player.lives}", self.font, BLACK, 60, 10)
         self.draw_text(f"Escudo: {escudo_txt}", self.font, cor_escudo, 200, 10)
         
-        # Mostra quanto falta para chegar
         distancia_restante = GOAL_DISTANCE - self.distance_traveled
         if distancia_restante < 0: distancia_restante = 0
         self.draw_text(f"Faltam: {distancia_restante}m", self.font, (0, 0, 255), SCREEN_WIDTH/2, 10)
@@ -286,7 +325,7 @@ class Game:
                 self.show_victory_screen()
                 self.state = START
             elif self.state == PLAYING:
-                self.handle_events() # Inputs mudaram para handle_events no loop
+                self.handle_events()
                 self.update()
                 self.draw()
                 self.clock.tick(FPS)
