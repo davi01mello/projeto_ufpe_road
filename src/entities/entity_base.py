@@ -8,7 +8,7 @@ class Entity(pygame.sprite.Sprite):
         super().__init__()
         self.image = None
         
-        # Lógica de carregar imagem (Preservada do seu código)
+        # Lógica de carregar imagem
         if image_name:
             try:
                 path = os.path.join("assets", "img", image_name)
@@ -18,13 +18,14 @@ class Entity(pygame.sprite.Sprite):
                 print(f"Erro ao carregar {image_name}: {e}")
                 pass 
         
-        # Fallback: Se não tiver imagem, cria um quadrado colorido
+        # Fallback: Se não tiver imagem, cria um quadrado
         if self.image is None:
             self.image = pygame.Surface([width, height])
             self.image.fill(color)
             
         self.rect = self.image.get_rect()
         
-        # Importante: No Crossy Road, guardamos a posição na GRADE também
-        self.rect.x = x
-        self.rect.y = y
+        # --- A CORREÇÃO MÁGICA ESTÁ AQUI 👇 ---
+        # Forçamos o 'int()' para garantir que nunca entre número quebrado
+        self.rect.x = int(x)
+        self.rect.y = int(y)

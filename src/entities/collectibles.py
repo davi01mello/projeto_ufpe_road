@@ -1,25 +1,23 @@
+import pygame
 import random
-from src.config import SCREEN_WIDTH, SCREEN_HEIGHT
+from src.config import SCREEN_WIDTH, SCREEN_HEIGHT, BLOCK_SIZE
 from src.entities.entity_base import Entity
 
-# Cores provisórias
+# Cores para fallback
 RED = (255, 0, 0)
 SILVER = (192, 192, 192)
 YELLOW = (255, 255, 0)
 
 class Collectible(Entity):
     def __init__(self, color, type_name, image_name):
-        # Gera uma posição aleatória alinhada à GRADE (multiplo de 50 ou 40)
-        # Isso facilita colisão no estilo Crossy Road
-        # Supondo BLOCK_SIZE = 50 (definido no config)
-        block_size = 50 
-        cols = SCREEN_WIDTH // block_size
-        rows = SCREEN_HEIGHT // block_size
+        # Gera uma posição X aleatória alinhada à grade
+        cols = SCREEN_WIDTH // BLOCK_SIZE
+        grid_x = random.randint(0, cols-1) * BLOCK_SIZE
         
-        grid_x = random.randint(0, cols-1) * block_size
-        grid_y = random.randint(1, rows-4) * block_size # Evita spawnar muito no topo ou base
+        # O Y será definido pelo jogo ao criar o item, então começamos com 0
+        start_y = 0 
         
-        super().__init__(grid_x, grid_y, 40, 40, color, image_name)
+        super().__init__(grid_x, start_y, 40, 40, color, image_name)
         self.type = type_name
 
 class BadgeFragment(Collectible):
