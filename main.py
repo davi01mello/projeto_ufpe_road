@@ -8,7 +8,7 @@ from src.entities.obstacles import Obstacle
 from src.entities.collectibles import BadgeFragment, EnergyDrink, Shield
 
 # --- CONFIGURAÇÃO ---
-REQUIRED_BADGES = 7
+REQUIRED_BADGES = 8
 GOAL_DISTANCE = 100  
 TOTAL_ROWS = GOAL_DISTANCE + 20 
 
@@ -24,6 +24,56 @@ GAME_OVER = 2
 VICTORY = 3
 
 class Game:
+    def load_ui_images(self):
+        """Carrega ícones usando caminho absoluto para evitar erros"""
+        import os # Garante que o os está importado aqui
+        
+        # 1. Descobre onde o main.py está
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        # 2. Monta o caminho até a pasta de imagens
+        img_dir = os.path.join(base_dir, "assets", "img")
+        
+        size = (32, 32) 
+
+        def load_and_scale(name):
+            # Monta o caminho completo do arquivo (ex: C:/Users/.../assets/img/refri.png)
+            full_path = os.path.join(img_dir, name)
+            
+            try:
+                img = pygame.image.load(full_path).convert_alpha()
+                print(f"✅ Carregado: {name}")
+                return pygame.transform.scale(img, size)
+            except FileNotFoundError:
+                print(f"❌ ARQUIVO NÃO ENCONTRADO: {full_path}")
+                print(f"   -> Verifique se o nome é '{name}' e se está na pasta certa.")
+                return pygame.Surface(size) # Retorna preto se falhar
+            except Exception as e:
+                print(f"❌ Erro ao abrir '{name}': {e}")
+                return pygame.Surface(size)
+
+        def create_black_version_for_badge(image):
+            # Se a imagem original for um quadrado preto (falha), essa função só retorna preto
+            if image.get_width() == 32 and image.get_at((0,0)) == (0,0,0,255):
+                return image 
+            mask = pygame.mask.from_surface(image)
+            return mask.to_surface(setcolor=(0, 0, 0, 150), unsetcolor=None)
+
+        print("\n--- INICIANDO CARREGAMENTO HUD ---")
+        
+        # 1. Crachá
+        self.icon_badge_color = load_and_scale("cracha.png")
+        self.icon_badge_black = create_black_version_for_badge(self.icon_badge_color)
+
+        # 2. Escudo
+        self.icon_shield_color = load_and_scale("capacete.png")
+        # Se este der erro, verifique se o arquivo está na pasta assets/img
+        self.icon_shield_black = load_and_scale("capacete_LOCK.png") 
+
+        # 3. Refri
+        self.icon_refri = load_and_scale("refri.png")
+        
+        print("----------------------------------\n")
+
     def __init__(self):
         pygame.init()
         try:
@@ -31,8 +81,10 @@ class Game:
             self.sound_enabled = True
         except:
             self.sound_enabled = False
+        self.load_ui_images()
+        self.map_layout = self.generate_map_layout()
 
-        self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+        self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.FULLSCREEN | pygame.SCALED)
         pygame.display.set_caption("CIn Road: Rumo ao Diploma")
         self.clock = pygame.time.Clock()
         
@@ -88,6 +140,8 @@ class Game:
 
         start_x = GRID_WIDTH // 2
         start_y = GRID_HEIGHT - 2
+        
+        # Garante que pega a skin selecionada ou usa o padrão
         skin = getattr(self, 'selected_skin', "aluno1frente.png")
         self.player = Player(start_x, start_y, skin) 
         self.all_sprites.add(self.player)
@@ -95,23 +149,24 @@ class Game:
         self.spawn_timer = 0
         self.score = 0
         self.distance_traveled = 0 
-        self.turbo_active = False
-        self.turbo_timer = 0
-        self.idle_frames = 0 
         
-        # MUDANÇA: Dicionário para controlar o tempo de spawn de cada rua
-        # Chave: Índice da Linha (int) -> Valor: Timer (int)
+        # --- MUDANÇA: Substituímos o Turbo por Slow Motion ---
+        self.slow_motion_timer = 0 # 0 significa desligado
+        self.turbo_active = False # (Mantemos desligado ou removemos)
+        # ----------------------------------------------------
+
+        self.idle_frames = 0 
         self.lane_timers = {} 
         
         if self.sound_enabled:
             try: pygame.mixer.music.play(-1)
             except: pass
 
-    def start_turbo(self):
-        self.turbo_active = True
-        self.turbo_timer = 60 
-        self.play_sound("turbo")
-        self.idle_frames = 0 
+    def start_slow_motion(self):
+        # 5 segundos * 60 FPS = 300 frames
+        self.slow_motion_timer = 300 
+        self.play_sound("turbo") # Pode manter o som ou trocar
+        print("ENERGIZADO!")
 
     def scroll_world(self):
         self.distance_traveled += 1
@@ -128,7 +183,7 @@ class Game:
         self.spawn_static_objects()
 
     def spawn_static_objects(self):
-        """Gera apenas itens e obras (coisas que não andam)"""
+        """Gera itens e obras com maior frequência para garantir os 8 crachás"""
         rows_remaining = len(self.map_layout) - 1 - self.distance_traveled
         rows_on_screen = SCREEN_HEIGHT // BLOCK_SIZE
         target_row_index = int(rows_remaining - rows_on_screen)
@@ -138,12 +193,18 @@ class Game:
         row_type = self.map_layout[target_row_index]
 
         if row_type == ROW_GRASS:
-            if random.random() < 0.5:
-                if random.random() < 0.3:
+            # MUDANÇA 1: Aumentei a chance de algo aparecer de 50% (0.5) para 80% (0.8)
+            if random.random() < 0.8:
+                
+                # MUDANÇA 2: Diminui a chance de ser OBRA (de 30% para 10%)
+                # Isso significa que 90% das vezes será um ITEM (Crachá/Refri/Escudo)
+                if random.random() < 0.1:
                     obs = Obstacle("obra", fixed_y=-BLOCK_SIZE)
                     self.all_sprites.add(obs)
                     self.obstacles.add(obs)
                 else:
+                    # Gera Item (Alta chance de ser Fragmento)
+                    # weights=[80, 10, 10] mantém o Crachá como o mais comum
                     item_class = random.choices([BadgeFragment, EnergyDrink, Shield], weights=[80, 10, 10], k=1)[0]
                     item = item_class()
                     item.rect.y = -BLOCK_SIZE 
@@ -218,20 +279,16 @@ class Game:
         # OBSTÁCULOS
         hit_obstacle = pygame.sprite.spritecollideany(self.player, self.obstacles)
         if hit_obstacle:
-            if self.turbo_active:
-                self.play_sound("hit")
-                hit_obstacle.kill()
-            else:
-                self.play_sound("hit")
-                tomou_dano = self.player.check_damage()
-                hit_obstacle.kill()
-                if tomou_dano:
-                    if self.player.lives > 0:
-                        self.player.reset_position()
-                    else:
-                        if self.sound_enabled: pygame.mixer.music.stop()
-                        self.play_sound("game_over")
-                        self.state = GAME_OVER
+            self.play_sound("hit")
+            tomou_dano = self.player.check_damage()
+            hit_obstacle.kill()
+            if tomou_dano:
+                if self.player.lives > 0:
+                    self.player.reset_position()
+                else:
+                    if self.sound_enabled: pygame.mixer.music.stop()
+                    self.play_sound("game_over")
+                    self.state = GAME_OVER
 
         # ITENS
         collected_item = pygame.sprite.spritecollideany(self.player, self.items)
@@ -242,33 +299,54 @@ class Game:
             elif isinstance(collected_item, Shield):
                 self.player.has_shield = True
             elif isinstance(collected_item, EnergyDrink):
-                self.start_turbo()
+                # --- MUDANÇA AQUI ---
+                self.start_slow_motion() 
             collected_item.kill()
 
     def handle_events(self):
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                self.running = False
-            
-            if event.type == pygame.KEYDOWN:
-                if event.key in [pygame.K_LEFT, pygame.K_RIGHT, pygame.K_UP, pygame.K_DOWN, 
-                                 pygame.K_w, pygame.K_a, pygame.K_s, pygame.K_d]:
-                    self.play_sound("jump")
-
-                if event.key == pygame.K_LEFT or event.key == pygame.K_a:
-                    self.player.move(-1, 0)
-                elif event.key == pygame.K_RIGHT or event.key == pygame.K_d:
-                    self.player.move(1, 0)
-                elif event.key == pygame.K_DOWN or event.key == pygame.K_s:
-                    self.player.move(0, 1) 
+            for event in pygame.event.get():
+                # 1. Fechar o jogo no X da janela
+                if event.type == pygame.QUIT:
+                    self.running = False
                 
-                elif event.key == pygame.K_UP or event.key == pygame.K_w:
-                    self.idle_frames = 0 
-                    if self.player.grid_y < 4:
-                        self.scroll_world() 
-                        self.player.update_sprite("back")
-                    else:
-                        self.player.move(0, -1)
+                # 2. Verificar teclas pressionadas
+                if event.type == pygame.KEYDOWN:
+                    
+                    # --- Comandos de Sistema ---
+                    if event.key == pygame.K_ESCAPE:
+                        self.running = False
+                    elif event.key == pygame.K_F11:
+                        pygame.display.toggle_fullscreen()
+
+                    # --- Movimentação ---
+                    # Toca som se for tecla de movimento
+                    if event.key in [pygame.K_LEFT, pygame.K_RIGHT, pygame.K_UP, pygame.K_DOWN, 
+                                    pygame.K_w, pygame.K_a, pygame.K_s, pygame.K_d]:
+                        self.play_sound("jump")
+
+                    # Esquerda
+                    if event.key == pygame.K_LEFT or event.key == pygame.K_a:
+                        self.player.move(-1, 0)
+                    
+                    # Direita
+                    elif event.key == pygame.K_RIGHT or event.key == pygame.K_d:
+                        self.player.move(1, 0)
+                    
+                    # Baixo (Frente)
+                    elif event.key == pygame.K_DOWN or event.key == pygame.K_s:
+                        self.player.move(0, 1) 
+                    
+                    # Cima (Costas/Andar)
+                    elif event.key == pygame.K_UP or event.key == pygame.K_w:
+                        self.idle_frames = 0 
+                        # Se o jogador estiver na parte superior da grade, o mundo anda
+                        if self.player.grid_y < 4:
+                            self.scroll_world() 
+                            # Força o sprite de costas pois o player.move não é chamado
+                            if hasattr(self.player, "update_sprite"):
+                                self.player.update_sprite("back")
+                        else:
+                            self.player.move(0, -1)
 
     def draw_background(self):
         rows_on_screen = SCREEN_HEIGHT // BLOCK_SIZE
@@ -396,49 +474,98 @@ class Game:
                     waiting = False
 
     def update(self):
-        if not self.turbo_active:
-            self.idle_frames += 1
-            if self.idle_frames >= 5 * 60:
-                if self.sound_enabled: pygame.mixer.music.stop()
-                self.play_sound("game_over")
-                self.state = GAME_OVER
+        # Gerenciamento de Ociosidade (Game Over se ficar parado)
+        self.idle_frames += 1
+        if self.idle_frames >= 5 * 60:
+            if self.sound_enabled: pygame.mixer.music.stop()
+            self.play_sound("game_over")
+            self.state = GAME_OVER
         
-        if self.turbo_active:
-            self.turbo_timer -= 1
-            if self.turbo_timer % 2 == 0:
-                self.scroll_world()
-            if self.turbo_timer <= 0:
-                self.turbo_active = False
+        # --- LÓGICA DA CÂMERA LENTA ---
+        slow_motion_active = False
+        if self.slow_motion_timer > 0:
+            self.slow_motion_timer -= 1
+            slow_motion_active = True
+        # ------------------------------
         
         self.manage_traffic()
-        self.all_sprites.update()
+        
+        # --- ATUALIZAÇÃO DOS SPRITES ---
+        # Passamos o argumento 'slow_motion_active' para os obstáculos
+        self.obstacles.update(slow_motion_active=slow_motion_active)
+        
+        # Os outros sprites (player, itens) atualizamos normal
+        self.items.update()
+        self.player.update() # Se o player tiver update, chama normal
+        # -------------------------------
+
         self.check_collisions()
 
     def draw(self):
         self.draw_background()
         self.all_sprites.draw(self.screen)
         
-        escudo_txt = "SIM" if self.player.has_shield else "NÃO"
-        cor_escudo = (0, 200, 0) if self.player.has_shield else BLACK
-
-        if self.turbo_active:
-            self.draw_text("!!! TURBO !!!", self.title_font, (255, 165, 0), SCREEN_WIDTH/2, 100)
-        elif self.idle_frames > 3 * 60:
-            self.draw_text("MOVA-SE!", self.alert_font, (255, 0, 0), SCREEN_WIDTH/2, 100)
-
-        self.draw_text(f"Vidas: {self.player.lives}", self.font, BLACK, 60, 10)
-        self.draw_text(f"Escudo: {escudo_txt}", self.font, cor_escudo, 200, 10)
+        # --- HUD (Interface) ---
         
+        # 1. VIDAS (Texto simples no canto esquerdo)
+        self.draw_text(f"Vidas: {self.player.lives}", self.font, BLACK, 60, 10)
+
+        # 2. DISTÂNCIA (Texto centralizado)
         distancia = GOAL_DISTANCE - self.distance_traveled
         if distancia < 0: distancia = 0
         self.draw_text(f"Faltam: {distancia}m", self.font, (0, 0, 255), SCREEN_WIDTH/2, 10)
-        
-        cor_score = BLACK
-        if self.score >= REQUIRED_BADGES: cor_score = (0, 180, 0) 
-        elif self.distance_traveled > GOAL_DISTANCE * 0.8: cor_score = (255, 0, 0)
 
-        self.draw_text(f"Crachás: {self.score}/{REQUIRED_BADGES}", self.font, cor_score, SCREEN_WIDTH - 100, 10)
+        # 3. ESCUDO (Ícone + Texto)
+        # Posição do escudo
+        shield_x, shield_y = 150, 10 
         
+        if self.player.has_shield:
+            self.screen.blit(self.icon_shield_color, (shield_x, shield_y))
+            txt_color = (0, 180, 0)
+            status = "ATIVO"
+        else:
+            self.screen.blit(self.icon_shield_black, (shield_x, shield_y))
+            txt_color = BLACK
+            status = "OFF"
+            
+        self.draw_text(status, self.font, txt_color, shield_x + 60, shield_y + 5)
+
+        # 4. CRACHÁS (Efeito de Enchimento)
+        # Desenha no canto direito
+        badge_x = SCREEN_WIDTH - 140
+        badge_y = 10
+        
+        # A. Desenha o fundo preto (base)
+        self.screen.blit(self.icon_badge_black, (badge_x, badge_y))
+        
+        # B. Calcula quanto do colorido deve aparecer (0 a 1.0)
+        ratio = min(self.score / REQUIRED_BADGES, 1.0) # Garante que não passa de 100%
+        
+        if ratio > 0:
+            pixel_height = int(32 * ratio) # 32 é a altura do ícone
+            
+            # Recorta a parte de baixo da imagem colorida
+            # area=(x, y, w, h) -> Pegamos a parte inferior da imagem original
+            rect_area = (0, 32 - pixel_height, 32, pixel_height)
+            
+            # Desenha por cima da preta, ajustando o Y para "nascer" de baixo
+            self.screen.blit(self.icon_badge_color, (badge_x, badge_y + (32 - pixel_height)), area=rect_area)
+
+        # Texto 0/8 ao lado
+        cor_score = (0, 180, 0) if self.score >= REQUIRED_BADGES else BLACK
+        self.draw_text(f"{self.score}/{REQUIRED_BADGES}", self.font, cor_score, badge_x + 60, badge_y + 5)
+
+        # 5. CÂMERA LENTA (Aparece centralizado embaixo se estiver ativo)
+        if self.slow_motion_timer > 0:
+            segundos = (self.slow_motion_timer // 60) + 1
+            # Desenha o ícone do refri pequeno centralizado
+            refri_x = SCREEN_WIDTH/2 - 100
+            self.screen.blit(self.icon_refri, (refri_x, 80))
+            self.draw_text(f"ENERGIZADO: {segundos}s", self.title_font, (0, 255, 255), SCREEN_WIDTH/2 + 20, 80)
+            
+        elif self.idle_frames > 3 * 60:
+            self.draw_text("MOVA-SE!", self.alert_font, (255, 0, 0), SCREEN_WIDTH/2, 80)
+
         pygame.display.flip()
 
     def run(self):
