@@ -17,6 +17,11 @@ BLACK = (0, 0, 0)
 GREEN = (34, 139, 34)
 BLUE = (0, 0, 255)
 
+# Sombra dos textos
+SHADOWCOLOR = (0, 0, 0)
+OFFSET = 4
+OFFSET_SMALL = 2
+
 # FPS
 FPS = 60
 
