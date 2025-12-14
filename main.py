@@ -70,7 +70,7 @@ class Game:
         self.icon_shield_black = load_and_scale("capacete_LOCK.png") 
 
         # 3. Refri
-        self.icon_refri = load_and_scale("refri.png")
+        self.icon_refri = load_and_scale("raio.png")
         
         print("----------------------------------\n")
 
@@ -81,16 +81,23 @@ class Game:
             self.sound_enabled = True
         except:
             self.sound_enabled = False
-        self.load_ui_images()
         self.map_layout = self.generate_map_layout()
 
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.FULLSCREEN | pygame.SCALED)
+        self.load_ui_images()
+        self.background_image = pygame.image.load("assets/img/telainicial.png").convert()
+        self.gameover_image = pygame.image.load("assets/img/gameover.png").convert()
+        self.aprovado_image = pygame.image.load("assets/img/aprovado.png").convert()
         pygame.display.set_caption("CIn Road: Rumo ao Diploma")
         self.clock = pygame.time.Clock()
         
-        self.font = pygame.font.SysFont("Arial", 24)
-        self.title_font = pygame.font.SysFont("Arial", 48, bold=True)
-        self.alert_font = pygame.font.SysFont("Arial", 36, bold=True)
+        self.font = pygame.font.SysFont("assets/fonts/PressStart2P.ttf", 24)
+        self.title_font = pygame.font.SysFont("assets/fonts/PressStart2P.ttf", 48, bold=True)
+        self.alert_font = pygame.font.SysFont("assets/fonts/PressStart2P.ttf", 36, bold=True)
+        #Criei para o título 'Escolha seu Personagem'
+        self.home_font = pygame.font.SysFont("assets/fonts/PressStart2P.ttf", 40, bold=False)
+        #Criei para o game over
+        self.gameover_font = pygame.font.SysFont("assets/fonts/PressStart2P.ttf", 58, bold = True)
         
         self.state = START
         self.running = True
@@ -418,13 +425,14 @@ class Game:
                         self.play_sound("collect")
                         waiting = False
 
-            self.screen.fill(WHITE)
-            self.draw_text("CIn Road", self.title_font, BLACK, SCREEN_WIDTH/2, 80)
-            self.draw_text(f"Meta: Chegar ao CIn com {REQUIRED_BADGES} crachás!", self.font, BLACK, SCREEN_WIDTH/2, 140)
-            self.draw_text("Escolha seu Personagem:", self.font, BLACK, SCREEN_WIDTH/2, 220)
+            self.screen.blit(self.background_image, (0, 0))
+            self.draw_text(f"Meta: Chegar ao CIn com {REQUIRED_BADGES} crachás!", self.font, WHITE, SCREEN_WIDTH/2, 140)
+            #Sombra do texto
+            self.draw_text("Escolha seu Personagem:", self.home_font, SHADOWCOLOR, SCREEN_WIDTH/2 + OFFSET, 480 + OFFSET)
+            self.draw_text("Escolha seu Personagem:", self.home_font, WHITE, SCREEN_WIDTH/2, 480)
 
-            x1, y1 = SCREEN_WIDTH/2 - 150, 300
-            x2, y2 = SCREEN_WIDTH/2 + 50, 300
+            x1, y1 = SCREEN_WIDTH/2 - 150, 330
+            x2, y2 = SCREEN_WIDTH/2 + 50, 330
 
             self.screen.blit(img_p1, (x1, y1))
             self.screen.blit(img_p2, (x2, y2))
@@ -439,7 +447,7 @@ class Game:
             pygame.display.flip()
 
     def show_game_over_screen(self):
-        self.screen.fill(BLACK)
+        self.screen.blit(self.gameover_image, (0, 0))
         if self.idle_frames >= 5 * 60:
             motivo = "Você ficou parado muito tempo!"
         elif self.score < REQUIRED_BADGES and self.distance_traveled >= GOAL_DISTANCE:
@@ -447,17 +455,29 @@ class Game:
         else:
             motivo = "Game Over!"
 
-        self.draw_text("GAME OVER", self.title_font, (255, 0, 0), SCREEN_WIDTH/2, SCREEN_HEIGHT/4)
-        self.draw_text(motivo, self.font, WHITE, SCREEN_WIDTH/2, SCREEN_HEIGHT/2)
-        self.draw_text("Tecle para reiniciar", self.font, WHITE, SCREEN_WIDTH/2, SCREEN_HEIGHT * 3/4)
+        #Sombra no título principal
+        self.draw_text("GAME OVER", self.gameover_font, SHADOWCOLOR, SCREEN_WIDTH/2 + OFFSET, SCREEN_HEIGHT/4 + OFFSET)
+        self.draw_text("GAME OVER", self.gameover_font, (255, 0, 0), SCREEN_WIDTH/2, SCREEN_HEIGHT/4)
+        #Sombra no texto do motivo
+        self.draw_text(motivo, self.alert_font, SHADOWCOLOR, SCREEN_WIDTH/2 + OFFSET_SMALL, SCREEN_HEIGHT/2 + OFFSET_SMALL)
+        self.draw_text(motivo, self.alert_font, WHITE, SCREEN_WIDTH/2, SCREEN_HEIGHT/2)
+        #Sombra no texto para reiniciar
+        self.draw_text("Tecle para reiniciar", self.alert_font, SHADOWCOLOR, SCREEN_WIDTH/2 + OFFSET_SMALL, SCREEN_HEIGHT * 3/4 + OFFSET_SMALL)
+        self.draw_text("Tecle para reiniciar", self.alert_font, WHITE, SCREEN_WIDTH/2, SCREEN_HEIGHT * 3/4)
         pygame.display.flip()
         self.wait_for_key()
 
     def show_victory_screen(self):
-        self.screen.fill(WHITE)
-        self.draw_text("APROVADO!", self.title_font, (0, 0, 255), SCREEN_WIDTH/2, SCREEN_HEIGHT/4)
-        self.draw_text(f"Crachás: {self.score}", self.font, BLACK, SCREEN_WIDTH/2, SCREEN_HEIGHT/2)
-        self.draw_text("Tecle para reiniciar", self.font, BLACK, SCREEN_WIDTH/2, SCREEN_HEIGHT * 3/4)
+        self.screen.blit(self.aprovado_image, (0, 0))
+        #Sombra no título principal
+        self.draw_text("APROVADO!", self.gameover_font, SHADOWCOLOR, SCREEN_WIDTH/2 + OFFSET, SCREEN_HEIGHT/4 + OFFSET)
+        self.draw_text("APROVADO!", self.gameover_font, (142, 248, 67), SCREEN_WIDTH/2, SCREEN_HEIGHT/4)
+        #Sombra no número de crachás
+        self.draw_text(f"Crachás: {self.score}", self.alert_font, SHADOWCOLOR, SCREEN_WIDTH/2 + OFFSET_SMALL, SCREEN_HEIGHT/2 + OFFSET_SMALL)
+        self.draw_text(f"Crachás: {self.score}", self.alert_font, WHITE, SCREEN_WIDTH/2, SCREEN_HEIGHT/2)
+        #Sombra no texto para reiniciar
+        self.draw_text("Tecle para reiniciar", self.alert_font, SHADOWCOLOR, SCREEN_WIDTH/2 + OFFSET_SMALL, SCREEN_HEIGHT * 3/4 + OFFSET_SMALL)
+        self.draw_text("Tecle para reiniciar", self.alert_font, WHITE, SCREEN_WIDTH/2, SCREEN_HEIGHT * 3/4)
         pygame.display.flip()
         self.wait_for_key()
 
@@ -559,7 +579,7 @@ class Game:
         if self.slow_motion_timer > 0:
             segundos = (self.slow_motion_timer // 60) + 1
             # Desenha o ícone do refri pequeno centralizado
-            refri_x = SCREEN_WIDTH/2 - 100
+            refri_x = SCREEN_WIDTH/2 - 185
             self.screen.blit(self.icon_refri, (refri_x, 80))
             self.draw_text(f"ENERGIZADO: {segundos}s", self.title_font, (0, 255, 255), SCREEN_WIDTH/2 + 20, 80)
             
