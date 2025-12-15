@@ -57,6 +57,27 @@ class Game:
                 return image 
             mask = pygame.mask.from_surface(image)
             return mask.to_surface(setcolor=(0, 0, 0, 150), unsetcolor=None)
+        
+        print("\n--- CARREGANDO TEXTURAS ---")
+        try:
+            # Carrega a Grama
+            path_grass = os.path.join(img_dir, "grass.png")
+            self.bg_grass = pygame.image.load(path_grass).convert() # .convert() é vital para performance
+            # Redimensiona para garantir que ocupe a largura da tela e altura do bloco
+            self.bg_grass = pygame.transform.scale(self.bg_grass, (SCREEN_WIDTH, BLOCK_SIZE))
+            print("✅ Grama carregada")
+
+            # Carrega a Estrada
+            path_road = os.path.join(img_dir, "road.png")
+            self.bg_road = pygame.image.load(path_road).convert()
+            self.bg_road = pygame.transform.scale(self.bg_road, (SCREEN_WIDTH, BLOCK_SIZE))
+            print("✅ Estrada carregada")
+            
+        except Exception as e:
+            print(f"❌ Erro ao carregar texturas de fundo: {e}")
+            print("   -> Usaremos cores sólidas como fallback.")
+            self.bg_grass = None
+            self.bg_road = None
 
         print("\n--- INICIANDO CARREGAMENTO HUD ---")
         
@@ -363,23 +384,43 @@ class Game:
             screen_y = SCREEN_HEIGHT - ((i + 1) * BLOCK_SIZE)
             logical_index = int(bottom_row_logical_index - i)
             
+            # Se estiver fora do mapa (fundo infinito para baixo)
             if logical_index < 0: 
-                pygame.draw.rect(self.screen, (200, 200, 255), (0, screen_y, SCREEN_WIDTH, BLOCK_SIZE))
+                # Pode usar a grama aqui também se quiser, ou manter a cor
+                if self.bg_grass:
+                    self.screen.blit(self.bg_grass, (0, screen_y))
+                else:
+                    pygame.draw.rect(self.screen, (200, 200, 255), (0, screen_y, SCREEN_WIDTH, BLOCK_SIZE))
                 continue
             
             row_type = self.map_layout[logical_index]
             
+            # --- DESENHA ESTRADA ---
             if row_type == ROW_ROAD:
-                pygame.draw.rect(self.screen, (50, 50, 50), (0, screen_y, SCREEN_WIDTH, BLOCK_SIZE))
-                pygame.draw.rect(self.screen, (255, 255, 255), (SCREEN_WIDTH//2 - 5, screen_y + 10, 10, 30))
+                if self.bg_road:
+                    self.screen.blit(self.bg_road, (0, screen_y))
+                else:
+                    # Fallback cor sólida se a imagem falhar
+                    pygame.draw.rect(self.screen, (50, 50, 50), (0, screen_y, SCREEN_WIDTH, BLOCK_SIZE))
+                
+                # Se sua imagem road.png JÁ TIVER as faixas pintadas, APAGUE a linha abaixo:
+                # pygame.draw.rect(self.screen, (255, 255, 255), (SCREEN_WIDTH//2 - 5, screen_y + 10, 10, 30))
             
+            # --- DESENHA GRAMA ---
             elif row_type == ROW_GRASS:
-                pygame.draw.rect(self.screen, (34, 139, 34), (0, screen_y, SCREEN_WIDTH, BLOCK_SIZE))
-                pygame.draw.rect(self.screen, (28, 100, 28), (0, screen_y + 45, SCREEN_WIDTH, 5))
+                if self.bg_grass:
+                    self.screen.blit(self.bg_grass, (0, screen_y))
+                else:
+                    # Fallback cor sólida
+                    pygame.draw.rect(self.screen, (34, 139, 34), (0, screen_y, SCREEN_WIDTH, BLOCK_SIZE))
+                    pygame.draw.rect(self.screen, (28, 100, 28), (0, screen_y + 45, SCREEN_WIDTH, 5))
             
+            # --- DESENHA CHEGADA (Mantive o padrão quadriculado) ---
             elif row_type == ROW_FINISH:
                 pygame.draw.rect(self.screen, (200, 200, 200), (0, screen_y, SCREEN_WIDTH, BLOCK_SIZE))
-                if logical_index == 9: 
+                # Desenha o quadriculado apenas na linha exata da chegada (índice 9 no seu layout generator)
+                # Ajuste a lógica do 'logical_index' se necessário para aparecer na hora certa
+                if logical_index < 15: # Exemplo: desenha quadriculado nas últimas linhas
                      for col in range(0, SCREEN_WIDTH, 40):
                         c = (0,0,0) if (col//40)%2==0 else (255,255,255)
                         pygame.draw.rect(self.screen, c, (col, screen_y, 40, BLOCK_SIZE))
