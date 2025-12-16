@@ -9,8 +9,8 @@ from src.entities.collectibles import BadgeFragment, EnergyDrink, Shield
 
 # --- CONFIGURAÇÃO ---
 REQUIRED_BADGES = 8
-GOAL_DISTANCE = 100  
-TOTAL_ROWS = GOAL_DISTANCE + 20 
+GOAL_DISTANCE = 100 
+TOTAL_ROWS = GOAL_DISTANCE + 50 # Buffer de segurança
 
 # Tipos de Linha
 ROW_GRASS = 0
@@ -26,74 +26,52 @@ VICTORY = 3
 class Game:
     def load_ui_images(self):
         """Carrega ícones usando caminho absoluto para evitar erros"""
-        import os # Garante que o os está importado aqui
+        import os 
         
-        # 1. Descobre onde o main.py está
         base_dir = os.path.dirname(os.path.abspath(__file__))
-        # 2. Monta o caminho até a pasta de imagens
         img_dir = os.path.join(base_dir, "assets", "img")
         
         size = (32, 32) 
 
         def load_and_scale(name):
-            # Monta o caminho completo do arquivo (ex: C:/Users/.../assets/img/refri.png)
             full_path = os.path.join(img_dir, name)
-            
             try:
                 img = pygame.image.load(full_path).convert_alpha()
-                print(f"✅ Carregado: {name}")
                 return pygame.transform.scale(img, size)
-            except FileNotFoundError:
-                print(f"❌ ARQUIVO NÃO ENCONTRADO: {full_path}")
-                print(f"   -> Verifique se o nome é '{name}' e se está na pasta certa.")
-                return pygame.Surface(size) # Retorna preto se falhar
-            except Exception as e:
-                print(f"❌ Erro ao abrir '{name}': {e}")
+            except:
                 return pygame.Surface(size)
 
         def create_black_version_for_badge(image):
-            # Se a imagem original for um quadrado preto (falha), essa função só retorna preto
             if image.get_width() == 32 and image.get_at((0,0)) == (0,0,0,255):
                 return image 
             mask = pygame.mask.from_surface(image)
             return mask.to_surface(setcolor=(0, 0, 0, 150), unsetcolor=None)
         
-        print("\n--- CARREGANDO TEXTURAS ---")
         try:
-            # Carrega a Grama
             path_grass = os.path.join(img_dir, "grass.png")
-            self.bg_grass = pygame.image.load(path_grass).convert() # .convert() é vital para performance
-            # Redimensiona para garantir que ocupe a largura da tela e altura do bloco
+            self.bg_grass = pygame.image.load(path_grass).convert() 
             self.bg_grass = pygame.transform.scale(self.bg_grass, (SCREEN_WIDTH, BLOCK_SIZE))
-            print("✅ Grama carregada")
 
-            # Carrega a Estrada
             path_road = os.path.join(img_dir, "road.png")
             self.bg_road = pygame.image.load(path_road).convert()
             self.bg_road = pygame.transform.scale(self.bg_road, (SCREEN_WIDTH, BLOCK_SIZE))
-            print("✅ Estrada carregada")
+
+            path_cin = os.path.join(img_dir, "cin_predio.png")
+            cin_surface = pygame.image.load(path_cin).convert_alpha()
+            # Ajuste o tamanho do prédio aqui se achar necessário
+            self.cin_img = pygame.transform.scale(cin_surface, (400, 300))
             
         except Exception as e:
-            print(f"❌ Erro ao carregar texturas de fundo: {e}")
-            print("   -> Usaremos cores sólidas como fallback.")
+            print(f"Erro textura: {e}")
             self.bg_grass = None
             self.bg_road = None
+            self.cin_img = None
 
-        print("\n--- INICIANDO CARREGAMENTO HUD ---")
-        
-        # 1. Crachá
         self.icon_badge_color = load_and_scale("cracha.png")
         self.icon_badge_black = create_black_version_for_badge(self.icon_badge_color)
-
-        # 2. Escudo
         self.icon_shield_color = load_and_scale("capacete.png")
-        # Se este der erro, verifique se o arquivo está na pasta assets/img
         self.icon_shield_black = load_and_scale("capacete_LOCK.png") 
-
-        # 3. Refri
         self.icon_refri = load_and_scale("raio.png")
-        
-        print("----------------------------------\n")
 
     def __init__(self):
         pygame.init()
@@ -102,7 +80,6 @@ class Game:
             self.sound_enabled = True
         except:
             self.sound_enabled = False
-        self.map_layout = self.generate_map_layout()
 
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.FULLSCREEN | pygame.SCALED)
         self.load_ui_images()
@@ -115,15 +92,12 @@ class Game:
         self.font = pygame.font.SysFont("assets/fonts/PressStart2P.ttf", 24)
         self.title_font = pygame.font.SysFont("assets/fonts/PressStart2P.ttf", 48, bold=True)
         self.alert_font = pygame.font.SysFont("assets/fonts/PressStart2P.ttf", 36, bold=True)
-        #Criei para o título 'Escolha seu Personagem'
         self.home_font = pygame.font.SysFont("assets/fonts/PressStart2P.ttf", 40, bold=False)
-        #Criei para o game over
         self.gameover_font = pygame.font.SysFont("assets/fonts/PressStart2P.ttf", 58, bold = True)
         
         self.state = START
         self.running = True
 
-        # SONS
         self.sounds = {}
         if self.sound_enabled:
             try:
@@ -147,8 +121,8 @@ class Game:
 
     def generate_map_layout(self):
         layout = []
-        for _ in range(10): layout.append(ROW_FINISH)
-            
+        # Gera o mapa normal (aleatório)
+        for _ in range(10): layout.append(ROW_GRASS)
         while len(layout) < TOTAL_ROWS:
             if random.random() < 0.5:
                 num = random.randint(2, 5)
@@ -157,6 +131,7 @@ class Game:
                 num = random.randint(1, 3)
                 for _ in range(num): layout.append(ROW_GRASS)
         
+        # Garante grama no início
         for i in range(1, 8):
             layout[-i] = ROW_GRASS
         return layout
@@ -169,7 +144,6 @@ class Game:
         start_x = GRID_WIDTH // 2
         start_y = GRID_HEIGHT - 2
         
-        # Garante que pega a skin selecionada ou usa o padrão
         skin = getattr(self, 'selected_skin', "aluno1frente.png")
         self.player = Player(start_x, start_y, skin) 
         self.all_sprites.add(self.player)
@@ -177,12 +151,7 @@ class Game:
         self.spawn_timer = 0
         self.score = 0
         self.distance_traveled = 0 
-        
-        # --- MUDANÇA: Substituímos o Turbo por Slow Motion ---
-        self.slow_motion_timer = 0 # 0 significa desligado
-        self.turbo_active = False # (Mantemos desligado ou removemos)
-        # ----------------------------------------------------
-
+        self.slow_motion_timer = 0 
         self.idle_frames = 0 
         self.lane_timers = {} 
         
@@ -191,10 +160,8 @@ class Game:
             except: pass
 
     def start_slow_motion(self):
-        # 5 segundos * 60 FPS = 300 frames
         self.slow_motion_timer = 300 
-        self.play_sound("turbo") # Pode manter o som ou trocar
-        print("ENERGIZADO!")
+        self.play_sound("turbo") 
 
     def scroll_world(self):
         self.distance_traveled += 1
@@ -211,28 +178,27 @@ class Game:
         self.spawn_static_objects()
 
     def spawn_static_objects(self):
-        """Gera itens e obras com maior frequência para garantir os 8 crachás"""
+        # Lógica de spawn baseada no mapa
         rows_remaining = len(self.map_layout) - 1 - self.distance_traveled
         rows_on_screen = SCREEN_HEIGHT // BLOCK_SIZE
         target_row_index = int(rows_remaining - rows_on_screen)
         
         if target_row_index < 0: return 
         
+        # Lógica de metros percorridos
+        current_meter = self.distance_traveled + rows_on_screen # Topo da tela
+        if current_meter >= GOAL_DISTANCE:
+            return
+
         row_type = self.map_layout[target_row_index]
 
         if row_type == ROW_GRASS:
-            # MUDANÇA 1: Aumentei a chance de algo aparecer de 50% (0.5) para 80% (0.8)
             if random.random() < 0.8:
-                
-                # MUDANÇA 2: Diminui a chance de ser OBRA (de 30% para 10%)
-                # Isso significa que 90% das vezes será um ITEM (Crachá/Refri/Escudo)
                 if random.random() < 0.1:
                     obs = Obstacle("obra", fixed_y=-BLOCK_SIZE)
                     self.all_sprites.add(obs)
                     self.obstacles.add(obs)
                 else:
-                    # Gera Item (Alta chance de ser Fragmento)
-                    # weights=[80, 10, 10] mantém o Crachá como o mais comum
                     item_class = random.choices([BadgeFragment, EnergyDrink, Shield], weights=[80, 10, 10], k=1)[0]
                     item = item_class()
                     item.rect.y = -BLOCK_SIZE 
@@ -240,37 +206,31 @@ class Game:
                     self.items.add(item)
 
     def manage_traffic(self):
-        """
-        Gera tráfego contínuo com espaçamento entre carros.
-        """
         rows_on_screen = SCREEN_HEIGHT // BLOCK_SIZE
         bottom_row_logical_index = len(self.map_layout) - 1 - self.distance_traveled
         
-        # Percorre as linhas visíveis
         for i in range(rows_on_screen + 2):
             screen_y = SCREEN_HEIGHT - ((i + 1) * BLOCK_SIZE)
+            
+            offset_from_player = i - 1
+            current_line_meter = self.distance_traveled + offset_from_player
+
+            if current_line_meter >= GOAL_DISTANCE:
+                continue
+
             logical_index = int(bottom_row_logical_index - i)
-            
             if logical_index < 0: continue
-            
-            # Se for RUA
+
             if self.map_layout[logical_index] == ROW_ROAD:
-                
-                # 1. Verifica/Atualiza o Timer dessa rua específica
                 if logical_index not in self.lane_timers:
                     self.lane_timers[logical_index] = 0
                 
-                # Se o timer ainda está contando, diminui e PULA essa rua (não cria carro)
                 if self.lane_timers[logical_index] > 0:
                     self.lane_timers[logical_index] -= 1
                     continue 
 
-                # 2. Se o timer zerou, tenta criar um carro
-                # Chance alta (5%) porque o timer já controla o fluxo
                 if random.random() < 0.05:
-                    
                     direction = "left" if logical_index % 2 == 0 else "right"
-                    
                     progress = self.distance_traveled / GOAL_DISTANCE
                     dificuldade = 1.0 + (progress * 1.5)
 
@@ -283,17 +243,9 @@ class Game:
                     
                     self.all_sprites.add(obs)
                     self.obstacles.add(obs)
-                    
-                    # 3. DEFINE O ESPAÇAMENTO PARA O PRÓXIMO CARRO
-                    # Gera um número entre 90 e 200 frames (1.5s a 3.5s de intervalo)
-                    # Isso garante que nunca venha um carro colado no outro
                     self.lane_timers[logical_index] = random.randint(90, 200)
 
-    def spawn_entities(self):
-        pass
-
     def check_collisions(self):
-        # VITÓRIA
         if self.distance_traveled >= GOAL_DISTANCE:
             if self.sound_enabled: pygame.mixer.music.stop()
             if self.score >= REQUIRED_BADGES:
@@ -304,7 +256,6 @@ class Game:
                 self.state = GAME_OVER
             return
 
-        # OBSTÁCULOS
         hit_obstacle = pygame.sprite.spritecollideany(self.player, self.obstacles)
         if hit_obstacle:
             self.play_sound("hit")
@@ -318,7 +269,6 @@ class Game:
                     self.play_sound("game_over")
                     self.state = GAME_OVER
 
-        # ITENS
         collected_item = pygame.sprite.spritecollideany(self.player, self.items)
         if collected_item:
             self.play_sound("collect")
@@ -327,50 +277,34 @@ class Game:
             elif isinstance(collected_item, Shield):
                 self.player.has_shield = True
             elif isinstance(collected_item, EnergyDrink):
-                # --- MUDANÇA AQUI ---
                 self.start_slow_motion() 
             collected_item.kill()
 
     def handle_events(self):
             for event in pygame.event.get():
-                # 1. Fechar o jogo no X da janela
                 if event.type == pygame.QUIT:
                     self.running = False
                 
-                # 2. Verificar teclas pressionadas
                 if event.type == pygame.KEYDOWN:
-                    
-                    # --- Comandos de Sistema ---
                     if event.key == pygame.K_ESCAPE:
                         self.running = False
                     elif event.key == pygame.K_F11:
                         pygame.display.toggle_fullscreen()
 
-                    # --- Movimentação ---
-                    # Toca som se for tecla de movimento
                     if event.key in [pygame.K_LEFT, pygame.K_RIGHT, pygame.K_UP, pygame.K_DOWN, 
-                                    pygame.K_w, pygame.K_a, pygame.K_s, pygame.K_d]:
+                                     pygame.K_w, pygame.K_a, pygame.K_s, pygame.K_d]:
                         self.play_sound("jump")
 
-                    # Esquerda
                     if event.key == pygame.K_LEFT or event.key == pygame.K_a:
                         self.player.move(-1, 0)
-                    
-                    # Direita
                     elif event.key == pygame.K_RIGHT or event.key == pygame.K_d:
                         self.player.move(1, 0)
-                    
-                    # Baixo (Frente)
                     elif event.key == pygame.K_DOWN or event.key == pygame.K_s:
                         self.player.move(0, 1) 
-                    
-                    # Cima (Costas/Andar)
                     elif event.key == pygame.K_UP or event.key == pygame.K_w:
                         self.idle_frames = 0 
-                        # Se o jogador estiver na parte superior da grade, o mundo anda
                         if self.player.grid_y < 4:
                             self.scroll_world() 
-                            # Força o sprite de costas pois o player.move não é chamado
                             if hasattr(self.player, "update_sprite"):
                                 self.player.update_sprite("back")
                         else:
@@ -380,50 +314,50 @@ class Game:
         rows_on_screen = SCREEN_HEIGHT // BLOCK_SIZE
         bottom_row_logical_index = len(self.map_layout) - 1 - self.distance_traveled
         
+        # --- 1. DESENHA O CHÃO ---
         for i in range(rows_on_screen + 1):
             screen_y = SCREEN_HEIGHT - ((i + 1) * BLOCK_SIZE)
-            logical_index = int(bottom_row_logical_index - i)
             
-            # Se estiver fora do mapa (fundo infinito para baixo)
-            if logical_index < 0: 
-                # Pode usar a grama aqui também se quiser, ou manter a cor
+            offset_from_player = i - 1
+            current_line_meter = self.distance_traveled + offset_from_player
+            
+            if current_line_meter >= GOAL_DISTANCE:
+                effective_type = ROW_GRASS 
+            else:
+                logical_index = int(bottom_row_logical_index - i)
+                if logical_index >= 0:
+                    effective_type = self.map_layout[logical_index]
+                else:
+                    effective_type = -1
+
+            if effective_type == -1 or effective_type == ROW_GRASS or effective_type == ROW_FINISH:
                 if self.bg_grass:
                     self.screen.blit(self.bg_grass, (0, screen_y))
                 else:
-                    pygame.draw.rect(self.screen, (200, 200, 255), (0, screen_y, SCREEN_WIDTH, BLOCK_SIZE))
-                continue
-            
-            row_type = self.map_layout[logical_index]
-            
-            # --- DESENHA ESTRADA ---
-            if row_type == ROW_ROAD:
+                    pygame.draw.rect(self.screen, (34, 139, 34), (0, screen_y, SCREEN_WIDTH, BLOCK_SIZE))
+            elif effective_type == ROW_ROAD:
                 if self.bg_road:
                     self.screen.blit(self.bg_road, (0, screen_y))
                 else:
-                    # Fallback cor sólida se a imagem falhar
                     pygame.draw.rect(self.screen, (50, 50, 50), (0, screen_y, SCREEN_WIDTH, BLOCK_SIZE))
-                
-                # Se sua imagem road.png JÁ TIVER as faixas pintadas, APAGUE a linha abaixo:
-                # pygame.draw.rect(self.screen, (255, 255, 255), (SCREEN_WIDTH//2 - 5, screen_y + 10, 10, 30))
+
+        # --- 2. DESENHA O CIn (AJUSTE: 5 BLOCOS ACIMA) ---
+        if self.cin_img:
+            player_y_visual = SCREEN_HEIGHT - (2 * BLOCK_SIZE)
+            blocks_to_go = GOAL_DISTANCE - self.distance_traveled
+            finish_line_top_y = player_y_visual - (blocks_to_go * BLOCK_SIZE)
             
-            # --- DESENHA GRAMA ---
-            elif row_type == ROW_GRASS:
-                if self.bg_grass:
-                    self.screen.blit(self.bg_grass, (0, screen_y))
-                else:
-                    # Fallback cor sólida
-                    pygame.draw.rect(self.screen, (34, 139, 34), (0, screen_y, SCREEN_WIDTH, BLOCK_SIZE))
-                    pygame.draw.rect(self.screen, (28, 100, 28), (0, screen_y + 45, SCREEN_WIDTH, 5))
+            cin_base_y = finish_line_top_y 
             
-            # --- DESENHA CHEGADA (Mantive o padrão quadriculado) ---
-            elif row_type == ROW_FINISH:
-                pygame.draw.rect(self.screen, (200, 200, 200), (0, screen_y, SCREEN_WIDTH, BLOCK_SIZE))
-                # Desenha o quadriculado apenas na linha exata da chegada (índice 9 no seu layout generator)
-                # Ajuste a lógica do 'logical_index' se necessário para aparecer na hora certa
-                if logical_index < 15: # Exemplo: desenha quadriculado nas últimas linhas
-                     for col in range(0, SCREEN_WIDTH, 40):
-                        c = (0,0,0) if (col//40)%2==0 else (255,255,255)
-                        pygame.draw.rect(self.screen, c, (col, screen_y, 40, BLOCK_SIZE))
+            # --- MUDANÇA AQUI ---
+            # Antes era 8, descemos 3 -> Agora são 5 blocos de altura
+            offset_altura = 5 * BLOCK_SIZE
+            
+            cin_draw_y = cin_base_y - self.cin_img.get_height() - offset_altura
+            
+            cin_x = (SCREEN_WIDTH // 2) - (self.cin_img.get_width() // 2)
+            
+            self.screen.blit(self.cin_img, (cin_x, cin_draw_y))
 
     def draw_text(self, text, font, color, x, y):
         img = font.render(text, True, color)
@@ -468,7 +402,6 @@ class Game:
 
             self.screen.blit(self.background_image, (0, 0))
             self.draw_text(f"Meta: Chegar ao CIn com {REQUIRED_BADGES} crachás!", self.font, WHITE, SCREEN_WIDTH/2, 140)
-            #Sombra do texto
             self.draw_text("Escolha seu Personagem:", self.home_font, SHADOWCOLOR, SCREEN_WIDTH/2 + OFFSET, 480 + OFFSET)
             self.draw_text("Escolha seu Personagem:", self.home_font, WHITE, SCREEN_WIDTH/2, 480)
 
@@ -496,13 +429,10 @@ class Game:
         else:
             motivo = "Game Over!"
 
-        #Sombra no título principal
         self.draw_text("GAME OVER", self.gameover_font, SHADOWCOLOR, SCREEN_WIDTH/2 + OFFSET, SCREEN_HEIGHT/4 + OFFSET)
         self.draw_text("GAME OVER", self.gameover_font, (255, 0, 0), SCREEN_WIDTH/2, SCREEN_HEIGHT/4)
-        #Sombra no texto do motivo
         self.draw_text(motivo, self.alert_font, SHADOWCOLOR, SCREEN_WIDTH/2 + OFFSET_SMALL, SCREEN_HEIGHT/2 + OFFSET_SMALL)
         self.draw_text(motivo, self.alert_font, WHITE, SCREEN_WIDTH/2, SCREEN_HEIGHT/2)
-        #Sombra no texto para reiniciar
         self.draw_text("Tecle para reiniciar", self.alert_font, SHADOWCOLOR, SCREEN_WIDTH/2 + OFFSET_SMALL, SCREEN_HEIGHT * 3/4 + OFFSET_SMALL)
         self.draw_text("Tecle para reiniciar", self.alert_font, WHITE, SCREEN_WIDTH/2, SCREEN_HEIGHT * 3/4)
         pygame.display.flip()
@@ -510,13 +440,10 @@ class Game:
 
     def show_victory_screen(self):
         self.screen.blit(self.aprovado_image, (0, 0))
-        #Sombra no título principal
         self.draw_text("APROVADO!", self.gameover_font, SHADOWCOLOR, SCREEN_WIDTH/2 + OFFSET, SCREEN_HEIGHT/4 + OFFSET)
         self.draw_text("APROVADO!", self.gameover_font, (142, 248, 67), SCREEN_WIDTH/2, SCREEN_HEIGHT/4)
-        #Sombra no número de crachás
         self.draw_text(f"Crachás: {self.score}", self.alert_font, SHADOWCOLOR, SCREEN_WIDTH/2 + OFFSET_SMALL, SCREEN_HEIGHT/2 + OFFSET_SMALL)
         self.draw_text(f"Crachás: {self.score}", self.alert_font, WHITE, SCREEN_WIDTH/2, SCREEN_HEIGHT/2)
-        #Sombra no texto para reiniciar
         self.draw_text("Tecle para reiniciar", self.alert_font, SHADOWCOLOR, SCREEN_WIDTH/2 + OFFSET_SMALL, SCREEN_HEIGHT * 3/4 + OFFSET_SMALL)
         self.draw_text("Tecle para reiniciar", self.alert_font, WHITE, SCREEN_WIDTH/2, SCREEN_HEIGHT * 3/4)
         pygame.display.flip()
@@ -535,30 +462,22 @@ class Game:
                     waiting = False
 
     def update(self):
-        # Gerenciamento de Ociosidade (Game Over se ficar parado)
         self.idle_frames += 1
         if self.idle_frames >= 5 * 60:
             if self.sound_enabled: pygame.mixer.music.stop()
             self.play_sound("game_over")
             self.state = GAME_OVER
         
-        # --- LÓGICA DA CÂMERA LENTA ---
         slow_motion_active = False
         if self.slow_motion_timer > 0:
             self.slow_motion_timer -= 1
             slow_motion_active = True
-        # ------------------------------
         
         self.manage_traffic()
         
-        # --- ATUALIZAÇÃO DOS SPRITES ---
-        # Passamos o argumento 'slow_motion_active' para os obstáculos
         self.obstacles.update(slow_motion_active=slow_motion_active)
-        
-        # Os outros sprites (player, itens) atualizamos normal
         self.items.update()
-        self.player.update() # Se o player tiver update, chama normal
-        # -------------------------------
+        self.player.update() 
 
         self.check_collisions()
 
@@ -566,20 +485,13 @@ class Game:
         self.draw_background()
         self.all_sprites.draw(self.screen)
         
-        # --- HUD (Interface) ---
-        
-        # 1. VIDAS (Texto simples no canto esquerdo)
+        # HUD
         self.draw_text(f"Vidas: {self.player.lives}", self.font, BLACK, 60, 10)
 
-        # 2. DISTÂNCIA (Texto centralizado)
-        distancia = GOAL_DISTANCE - self.distance_traveled
-        if distancia < 0: distancia = 0
+        distancia = max(0, GOAL_DISTANCE - self.distance_traveled)
         self.draw_text(f"Faltam: {distancia}m", self.font, (0, 0, 255), SCREEN_WIDTH/2, 10)
 
-        # 3. ESCUDO (Ícone + Texto)
-        # Posição do escudo
         shield_x, shield_y = 150, 10 
-        
         if self.player.has_shield:
             self.screen.blit(self.icon_shield_color, (shield_x, shield_y))
             txt_color = (0, 180, 0)
@@ -588,38 +500,23 @@ class Game:
             self.screen.blit(self.icon_shield_black, (shield_x, shield_y))
             txt_color = BLACK
             status = "OFF"
-            
         self.draw_text(status, self.font, txt_color, shield_x + 60, shield_y + 5)
 
-        # 4. CRACHÁS (Efeito de Enchimento)
-        # Desenha no canto direito
         badge_x = SCREEN_WIDTH - 140
         badge_y = 10
-        
-        # A. Desenha o fundo preto (base)
         self.screen.blit(self.icon_badge_black, (badge_x, badge_y))
         
-        # B. Calcula quanto do colorido deve aparecer (0 a 1.0)
-        ratio = min(self.score / REQUIRED_BADGES, 1.0) # Garante que não passa de 100%
-        
+        ratio = min(self.score / REQUIRED_BADGES, 1.0) 
         if ratio > 0:
-            pixel_height = int(32 * ratio) # 32 é a altura do ícone
-            
-            # Recorta a parte de baixo da imagem colorida
-            # area=(x, y, w, h) -> Pegamos a parte inferior da imagem original
+            pixel_height = int(32 * ratio) 
             rect_area = (0, 32 - pixel_height, 32, pixel_height)
-            
-            # Desenha por cima da preta, ajustando o Y para "nascer" de baixo
             self.screen.blit(self.icon_badge_color, (badge_x, badge_y + (32 - pixel_height)), area=rect_area)
 
-        # Texto 0/8 ao lado
         cor_score = (0, 180, 0) if self.score >= REQUIRED_BADGES else BLACK
         self.draw_text(f"{self.score}/{REQUIRED_BADGES}", self.font, cor_score, badge_x + 60, badge_y + 5)
 
-        # 5. CÂMERA LENTA (Aparece centralizado embaixo se estiver ativo)
         if self.slow_motion_timer > 0:
             segundos = (self.slow_motion_timer // 60) + 1
-            # Desenha o ícone do refri pequeno centralizado
             refri_x = SCREEN_WIDTH/2 - 185
             self.screen.blit(self.icon_refri, (refri_x, 80))
             self.draw_text(f"ENERGIZADO: {segundos}s", self.title_font, (0, 255, 255), SCREEN_WIDTH/2 + 20, 80)
