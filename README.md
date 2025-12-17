@@ -1,6 +1,7 @@
-# 🐊 UFPE Road: O Desafio do Campus
+# 🎓 CIn Road: Rumo ao Diploma
 
-> Projeto da disciplina de Introdução à Programação (2025.2) - CIn/UFPE.
+> **Projeto da disciplina de Introdução à Programação (2025.2)**
+> **Instituição:** Centro de Informática (CIn) - UFPE
 
 ## 👥 Equipe de Desenvolvimento
 | Nome | Login | Email |
@@ -15,83 +16,26 @@
 ---
 
 ## 📝 Sobre o Projeto
-**UFPE Road** é um jogo de arcade em estilo *Endless Runner* (baseado em *Crossy Road*), desenvolvido inteiramente em Python utilizando a biblioteca **PyGame** e conceitos de **Orientação a Objetos**.
+**CIn Road** é um jogo de ação e estratégia 2D desenvolvido em Python com a biblioteca **PyGame**. Inspirado no clássico *Crossy Road*, o objetivo é guiar um estudante do CIn em uma jornada desafiadora até o diploma.
 
-O jogador controla um aluno que deve atravessar o perigoso campus da UFPE, desviando de ônibus "Circular", carros e obras intermináveis, enquanto coleta fragmentos de crachá e lanches para sobreviver.
+O jogador deve avançar por um mapa gerado proceduralmente, desviando de **ônibus circulares**, **carros** e **obras**, enquanto gerencia seus recursos coletando **fragmentos de crachá** (pontuação), **energéticos** (efeito de câmera lenta) e **escudos** (proteção contra dano).
 
----
-
-## 🎮 Como Rodar o Jogo
-[cite_start]Siga os passos abaixo para executar o projeto em sua máquina:
-
-### Pré-requisitos
-* Python 3.x instalado.
-* Gerenciador de pacotes `pip`.
-
-### Instalação
-1.  **Clone o repositório:**
-    ```bash
-    git clone [https://github.com/SEU_USUARIO/projeto_ufpe_road.git](https://github.com/SEU_USUARIO/projeto_ufpe_road.git)
-    cd projeto_ufpe_road
-    ```
-
-2.  **Instale as dependências:**
-    ```bash
-    pip install -r requirements.txt
-    # Ou manualmente: pip install pygame
-    ```
-
-3.  **Execute o jogo:**
-    ```bash
-    python main.py
-    ```
-
-### Controles
-* **Setas Direcionais:** Movem o personagem (Cima, Baixo, Esquerda, Direita).
-* **ESC:** Sair do jogo.
+[cite_start]O sistema foi construído rigorosamente sobre o paradigma de **Orientação a Objetos**, garantindo código modular e extensível[cite: 10, 15].
 
 ---
 
-## [cite_start]📂 Arquitetura do Projeto [cite: 50]
-*Esta seção descreve como o código foi organizado baseando-se em Orientação a Objetos.*
+## 📂 Arquitetura do Projeto
+[cite_start]O código foi organizado utilizando **Modularização** para separar responsabilidades e facilitar o trabalho em grupo[cite: 50]. A estrutura de arquivos final é:
 
-O projeto segue uma estrutura modular:
-* `src/entidades.py`: Contém a classe mãe `Entidade` e as classes filhas (`Aluno`, `Obstaculo`, `Coletavel`), aplicando **Herança** e **Polimorfismo**.
-* `src/jogo.py`: Gerencia o loop principal, eventos e atualização de tela (Classe `Game`).
-* `src/config.py`: Centraliza constantes (cores, dimensões) para fácil manutenção.
-* `main.py`: Ponto de entrada da aplicação.
-
-*(Preencher mais detalhes aqui conforme o desenvolvimento avançar)*
-
----
-
-## [cite_start]🛠️ Ferramentas e Bibliotecas Utilizadas [cite: 51]
-* **Python:** Linguagem base do projeto.
-* **PyGame:** Escolhido por ser uma biblioteca robusta para criação de jogos 2D, facilitando o gerenciamento de sprites, colisiones e loops de eventos.
-* **Git/GitHub:** Para versionamento e trabalho colaborativo em equipe.
-
----
-
-## [cite_start]🧩 Conceitos de POO Utilizados [cite: 53]
-* **Classes e Objetos:** Utilizados para representar todos os elementos do jogo (Jogador, Inimigos, Itens).
-* **Herança:** A classe `Aluno` herda de `Entidade` (Sprite), reaproveitando código de posição e renderização.
-* **Polimorfismo:** (Descrever aqui como diferentes obstáculos agem de forma diferente usando os mesmos métodos).
-* **Encapsulamento:** (Descrever uso de métodos para alterar atributos internos como `vida` ou `pontuacao`).
-
----
-
-## [cite_start]🚧 Desafios e Lições Aprendidas [cite: 54]
-
-### [cite_start]1. Maior Erro Cometido [cite: 55]
-*(Espaço reservado para descrever um erro técnico ou de organização, ex: conflito de merge no Git ou erro na lógica de colisão)*
-
-### [cite_start]2. Maior Desafio Enfrentado [cite: 56]
-*(Espaço reservado para descrever a parte mais difícil, ex: implementar a movimentação em grid ou gerenciar a velocidade dos obstáculos)*
-
-### [cite_start]3. Lições Aprendidas [cite: 57]
-*(Espaço reservado para o que o grupo aprendeu, ex: importância da modularização, pair programming, funcionamento do Pygame)*
-
----
-
-## [cite_start]📸 Galeria do Projeto [cite: 51]
-*(Adicionar capturas de tela do jogo funcionando aqui)*
+```text
+projeto/
+│
+├── main.py                  # Classe Game: Gerencia o loop principal, estados (Start, Playing, GameOver) e eventos.
+├── src/
+│   ├── config.py            # Centraliza constantes (tamanho da tela, cores, FPS, distância da meta).
+│   └── entities/
+│       ├── entity_base.py   # Classe Mãe (Entity): Define imagem, rect e posição para todos os objetos.
+│       ├── player.py        # Classe Player: Lógica de movimento em grade, animação de sprite e sistema de vidas.
+│       ├── obstacles.py     # Classe Obstacle: Lógica de tráfego, direção e velocidade variável.
+│       └── collectibles.py  # Classes Itens: BadgeFragment, EnergyDrink e Shield (Polimorfismo).
+└── assets/                  # Imagens e Sons
