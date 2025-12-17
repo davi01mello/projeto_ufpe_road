@@ -7,8 +7,7 @@ from src.entities.player import Player
 from src.entities.obstacles import Obstacle
 from src.entities.collectibles import BadgeFragment, EnergyDrink, Shield
 
-# --- CONFIGURAÇÃO ---
-REQUIRED_BADGES = 8
+# --- CONFIGURAÇÃO GERAL ---
 GOAL_DISTANCE = 100 
 TOTAL_ROWS = GOAL_DISTANCE + 50 # Buffer de segurança
 
@@ -17,12 +16,16 @@ ROW_GRASS = 0
 ROW_ROAD = 1
 ROW_FINISH = 2
 
-# Estados
-START = 0
-PLAYING = 1
-GAME_OVER = 2
-VICTORY = 3
-DIFFICULTY_SELECT = 4 
+# Estados do Jogo
+MENU = 0
+CHARACTER_SELECT = 1 
+PLAYING = 2
+GAME_OVER = 3
+VICTORY = 4
+DIFFICULTY_SELECT = 5
+SETTINGS = 6 
+TUTORIAL = 7 
+CREDITS = 8 
 
 class Game:
     def load_ui_images(self):
@@ -89,73 +92,79 @@ class Game:
         pygame.display.set_caption("CIn Road: Rumo ao Diploma")
         self.clock = pygame.time.Clock()
         
+        # Fontes
         self.font = pygame.font.SysFont("assets/fonts/PressStart2P.ttf", 24)
+        self.small_font = pygame.font.SysFont("assets/fonts/PressStart2P.ttf", 18) 
         self.title_font = pygame.font.SysFont("assets/fonts/PressStart2P.ttf", 48, bold=True)
         self.alert_font = pygame.font.SysFont("assets/fonts/PressStart2P.ttf", 36, bold=True)
         self.home_font = pygame.font.SysFont("assets/fonts/PressStart2P.ttf", 40, bold=False)
         self.gameover_font = pygame.font.SysFont("assets/fonts/PressStart2P.ttf", 58, bold = True)
         
-        self.state = START
+        self.state = MENU
         self.running = True
-        self.difficulty_multiplier = 1.0 # Padrão
+        self.difficulty_multiplier = 1.0 
+        self.volume_level = 0.5 
+        self.required_badges = 8 
+        self.is_fullscreen = True
 
         self.sounds = {}
         if self.sound_enabled:
             try:
                 pygame.mixer.music.load("assets/sounds/musica.mp3")
-                pygame.mixer.music.set_volume(0.4) 
+                pygame.mixer.music.set_volume(self.volume_level) 
                 self.sounds["jump"] = pygame.mixer.Sound("assets/sounds/pulo.wav")
                 self.sounds["hit"] = pygame.mixer.Sound("assets/sounds/dano.wav")
                 self.sounds["collect"] = pygame.mixer.Sound("assets/sounds/item.wav")
                 self.sounds["game_over"] = pygame.mixer.Sound("assets/sounds/game_over.wav")
                 self.sounds["win"] = pygame.mixer.Sound("assets/sounds/vitoria.wav")
                 self.sounds["turbo"] = pygame.mixer.Sound("assets/sounds/item.wav")
-                if "jump" in self.sounds: self.sounds["jump"].set_volume(0.3)
+                self.update_sound_volumes()
             except: pass
 
-        # REMOVIDO DAQUI: self.map_layout = self.generate_map_layout()
-        # O mapa agora é gerado no new_game() para considerar a dificuldade escolhida
+    def update_sound_volumes(self):
+        if not self.sound_enabled: return
+        try:
+            pygame.mixer.music.set_volume(self.volume_level)
+            for sound in self.sounds.values():
+                sound.set_volume(self.volume_level)
+        except: pass
 
     def play_sound(self, name):
         if self.sound_enabled and name in self.sounds:
             try: self.sounds[name].play()
             except: pass
 
-    def generate_map_layout(self):
-        """ Gera o mapa considerando a dificuldade atual """
-        layout = []
-        
-        # --- LÓGICA DE DIFICULDADE DO MAPA ---
-        # Se dificuldade > 1.5 (Difícil), chance de estrada aumenta drasticamente
-        is_hard_mode = self.difficulty_multiplier >= 1.5
-        
-        chance_road = 0.8 if is_hard_mode else 0.5  # 80% chance de estrada no difícil
-        min_road_block = 3 if is_hard_mode else 2   # Blocos de estrada maiores no difícil
-        max_road_block = 8 if is_hard_mode else 5
-        # -------------------------------------
+    # --- NOVO MÉTODO VISUAL: OVERLAY ESCURO ---
+    def draw_dim_overlay(self):
+        """Desenha uma tela preta semi-transparente para melhorar a leitura"""
+        overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+        overlay.set_alpha(200) # Transparência (0 a 255). 200 é bem escuro.
+        overlay.fill((0, 0, 0)) # Preto
+        self.screen.blit(overlay, (0, 0))
 
-        # Gera o mapa inicial (grama segura)
+    def generate_map_layout(self):
+        layout = []
+        is_hard_mode = self.difficulty_multiplier >= 1.5
+        chance_road = 0.8 if is_hard_mode else 0.5  
+        min_road_block = 3 if is_hard_mode else 2   
+        max_road_block = 8 if is_hard_mode else 5
+
         for _ in range(10): layout.append(ROW_GRASS)
         
         while len(layout) < TOTAL_ROWS:
             if random.random() < chance_road:
-                # Gera bloco de estrada
                 num = random.randint(min_road_block, max_road_block)
                 for _ in range(num): layout.append(ROW_ROAD)
             else:
-                # Gera bloco de grama (descanso)
-                num = random.randint(1, 3) # Grama é curta
+                num = random.randint(1, 3) 
                 for _ in range(num): layout.append(ROW_GRASS)
         
-        # Garante grama no final (meta)
         for i in range(1, 8):
             layout[-i] = ROW_GRASS
         return layout
 
     def new_game(self):
-        # 1. Gera o mapa AGORA, sabendo a dificuldade escolhida
         self.map_layout = self.generate_map_layout()
-
         self.all_sprites = pygame.sprite.Group()
         self.obstacles = pygame.sprite.Group()
         self.items = pygame.sprite.Group()
@@ -250,7 +259,6 @@ class Game:
                     direction = "left" if logical_index % 2 == 0 else "right"
                     progress = self.distance_traveled / GOAL_DISTANCE
                     
-                    # --- CÁLCULO DE VELOCIDADE ---
                     base_dificuldade = 1.0 + (progress * 1.5)
                     final_difficulty = base_dificuldade * self.difficulty_multiplier
 
@@ -263,13 +271,12 @@ class Game:
                     
                     self.all_sprites.add(obs)
                     self.obstacles.add(obs)
-                    # Timer aleatório para não spawnar carro em cima de carro
                     self.lane_timers[logical_index] = random.randint(90, 200)
 
     def check_collisions(self):
         if self.distance_traveled >= GOAL_DISTANCE:
             if self.sound_enabled: pygame.mixer.music.stop()
-            if self.score >= REQUIRED_BADGES:
+            if self.score >= self.required_badges:
                 self.play_sound("win")
                 self.state = VICTORY
             else:
@@ -308,9 +315,10 @@ class Game:
                 
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:
-                        self.running = False
+                        self.state = MENU
                     elif event.key == pygame.K_F11:
                         pygame.display.toggle_fullscreen()
+                        self.is_fullscreen = not self.is_fullscreen
 
                     if event.key in [pygame.K_LEFT, pygame.K_RIGHT, pygame.K_UP, pygame.K_DOWN, 
                                      pygame.K_w, pygame.K_a, pygame.K_s, pygame.K_d]:
@@ -335,7 +343,6 @@ class Game:
         rows_on_screen = SCREEN_HEIGHT // BLOCK_SIZE
         bottom_row_logical_index = len(self.map_layout) - 1 - self.distance_traveled
         
-        # --- 1. DESENHA O CHÃO ---
         for i in range(rows_on_screen + 1):
             screen_y = SCREEN_HEIGHT - ((i + 1) * BLOCK_SIZE)
             
@@ -362,17 +369,14 @@ class Game:
                 else:
                     pygame.draw.rect(self.screen, (50, 50, 50), (0, screen_y, SCREEN_WIDTH, BLOCK_SIZE))
 
-        # --- 2. DESENHA O CIn ---
         if self.cin_img:
             player_y_visual = SCREEN_HEIGHT - (2 * BLOCK_SIZE)
             blocks_to_go = GOAL_DISTANCE - self.distance_traveled
             finish_line_top_y = player_y_visual - (blocks_to_go * BLOCK_SIZE)
-            
             cin_base_y = finish_line_top_y 
             offset_altura = 5 * BLOCK_SIZE
             cin_draw_y = cin_base_y - self.cin_img.get_height() - offset_altura
             cin_x = (SCREEN_WIDTH // 2) - (self.cin_img.get_width() // 2)
-            
             self.screen.blit(self.cin_img, (cin_x, cin_draw_y))
 
     def draw_text(self, text, font, color, x, y):
@@ -381,7 +385,178 @@ class Game:
         rect.midtop = (x, y)
         self.screen.blit(img, rect)
 
-    def show_start_screen(self):
+    # --- MENU PRINCIPAL ---
+    def show_main_menu(self):
+        options = ["INICIAR JOGO", "COMO JOGAR", "CONFIGURAÇÕES", "CRÉDITOS", "SAIR"]
+        index = 0
+        waiting = True
+        pygame.event.clear()
+        
+        if self.sound_enabled and not pygame.mixer.music.get_busy():
+            try: pygame.mixer.music.play(-1)
+            except: pass
+
+        while waiting:
+            self.clock.tick(FPS)
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    waiting = False
+                    self.running = False
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_UP or event.key == pygame.K_w:
+                        self.play_sound("jump")
+                        index = (index - 1) % len(options)
+                    elif event.key == pygame.K_DOWN or event.key == pygame.K_s:
+                        self.play_sound("jump")
+                        index = (index + 1) % len(options)
+                    elif event.key == pygame.K_RETURN:
+                        self.play_sound("collect")
+                        if index == 0: self.state = CHARACTER_SELECT
+                        elif index == 1: self.state = TUTORIAL
+                        elif index == 2: self.state = SETTINGS
+                        elif index == 3: self.state = CREDITS
+                        elif index == 4: self.running = False
+                        waiting = False
+
+            self.screen.blit(self.background_image, (0, 0))
+            
+            for i, text in enumerate(options):
+                color = (255, 255, 0) if i == index else WHITE
+                prefix = "> " if i == index else "  "
+                
+                pos_y = 280 + (i * 50) 
+                self.draw_text(f"{prefix}{text}", self.home_font, SHADOWCOLOR, SCREEN_WIDTH/2+2, pos_y+2)
+                self.draw_text(f"{prefix}{text}", self.home_font, color, SCREEN_WIDTH/2, pos_y)
+            
+            pygame.display.flip()
+
+    # --- CONFIGURAÇÕES (COM OVERLAY ESCURO) ---
+    def show_settings_screen(self):
+        options = ["VOLTAR"]
+        waiting = True
+        pygame.event.clear()
+
+        while waiting:
+            self.clock.tick(FPS)
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    waiting = False
+                    self.running = False
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE:
+                        self.state = MENU 
+                        waiting = False
+                    
+                    if event.key == pygame.K_RETURN:
+                        self.play_sound("collect")
+                        pygame.display.toggle_fullscreen()
+                        self.is_fullscreen = not self.is_fullscreen
+                    
+                    if event.key == pygame.K_LEFT or event.key == pygame.K_a:
+                        self.volume_level = max(0.0, self.volume_level - 0.1)
+                        self.update_sound_volumes()
+                    elif event.key == pygame.K_RIGHT or event.key == pygame.K_d:
+                        self.volume_level = min(1.0, self.volume_level + 0.1)
+                        self.update_sound_volumes()
+
+            self.screen.blit(self.background_image, (0, 0))
+            self.draw_dim_overlay() # <--- APLICA O FILTRO ESCURO
+            
+            self.draw_text("CONFIGURAÇÕES", self.alert_font, WHITE, SCREEN_WIDTH/2, 80)
+
+            # Barra de Volume
+            vol_perc = int(self.volume_level * 100)
+            self.draw_text(f"VOLUME: {vol_perc}%", self.home_font, WHITE, SCREEN_WIDTH/2, 220)
+            self.draw_text("(Setas Esq/Dir)", self.small_font, (200,200,200), SCREEN_WIDTH/2, 260)
+
+            # Tela Cheia Toggle
+            status_tela = "LIGADO" if self.is_fullscreen else "DESLIGADO"
+            self.draw_text(f"TELA CHEIA: {status_tela}", self.home_font, WHITE, SCREEN_WIDTH/2, 350)
+            self.draw_text("(Pressione ENTER)", self.small_font, (200,200,200), SCREEN_WIDTH/2, 390)
+            
+            self.draw_text("ESC para voltar", self.font, (255, 255, 0), SCREEN_WIDTH/2, 520)
+
+            pygame.display.flip()
+
+    # --- TUTORIAL (COM OVERLAY ESCURO) ---
+    def show_tutorial_screen(self):
+        waiting = True
+        pygame.event.clear()
+        
+        while waiting:
+            self.clock.tick(FPS)
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    waiting = False
+                    self.running = False
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE or event.key == pygame.K_RETURN:
+                        self.state = MENU
+                        waiting = False
+
+            self.screen.blit(self.background_image, (0, 0))
+            self.draw_dim_overlay() # <--- APLICA O FILTRO ESCURO
+            
+            self.draw_text("COMO JOGAR", self.alert_font, WHITE, SCREEN_WIDTH/2, 50)
+            
+            # Controles
+            self.draw_text("Use as SETAS ou WASD para mover.", self.font, WHITE, SCREEN_WIDTH/2, 110)
+            self.draw_text("Desvie dos carros e obras!", self.font, WHITE, SCREEN_WIDTH/2, 150)
+            
+            # Ícones e Explicações
+            # Crachá
+            self.screen.blit(self.icon_badge_color, (150, 230))
+            self.draw_text("CRACHÁ: Pontuação para passar.", self.small_font, (200,200,200), SCREEN_WIDTH/2 + 20, 240)
+
+            # Escudo
+            self.screen.blit(self.icon_shield_color, (150, 310))
+            self.draw_text("CAPACETE: Protege de 1 dano.", self.small_font, (200,200,200), SCREEN_WIDTH/2 + 20, 320)
+
+            # Energético
+            self.screen.blit(self.icon_refri, (150, 390))
+            self.draw_text("ENERGÉTICO: Câmera Lenta (5s).", self.small_font, (200,200,200), SCREEN_WIDTH/2 + 20, 400)
+
+            self.draw_text("Pressione ENTER para voltar", self.font, (255, 255, 0), SCREEN_WIDTH/2, 520)
+            pygame.display.flip()
+
+    # --- CRÉDITOS (COM OVERLAY ESCURO) ---
+    def show_credits_screen(self):
+        waiting = True
+        pygame.event.clear()
+        
+        team = [
+            "Davi de Souza Mello",
+            "Davi Rosendo Carvalho",
+            "Gabriel Godoy Carvalho",
+            "João Felipe Costa",
+            "João Pedro Medeiros",
+            "Vitor Costa Nunes"
+        ]
+
+        while waiting:
+            self.clock.tick(FPS)
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    waiting = False
+                    self.running = False
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE or event.key == pygame.K_RETURN:
+                        self.state = MENU
+                        waiting = False
+
+            self.screen.blit(self.background_image, (0, 0))
+            self.draw_dim_overlay() # <--- APLICA O FILTRO ESCURO
+            
+            self.draw_text("CRÉDITOS", self.alert_font, WHITE, SCREEN_WIDTH/2, 60)
+            self.draw_text("Equipe de Desenvolvimento:", self.font, (200,200,200), SCREEN_WIDTH/2, 120)
+
+            for i, name in enumerate(team):
+                self.draw_text(name, self.font, WHITE, SCREEN_WIDTH/2, 180 + (i * 40))
+
+            self.draw_text("Pressione ENTER para voltar", self.font, (255, 255, 0), SCREEN_WIDTH/2, 520)
+            pygame.display.flip()
+
+    def show_character_select(self): 
         try:
             img_p1 = pygame.image.load("assets/img/aluno1frente.png").convert_alpha()
             img_p1 = pygame.transform.scale(img_p1, (100, 100))
@@ -395,10 +570,6 @@ class Game:
         waiting = True
         pygame.event.clear()
         
-        if self.sound_enabled and not pygame.mixer.music.get_busy():
-             try: pygame.mixer.music.play(-1)
-             except: pass
-
         while waiting:
             self.clock.tick(FPS)
             for event in pygame.event.get():
@@ -417,7 +588,7 @@ class Game:
                         waiting = False
 
             self.screen.blit(self.background_image, (0, 0))
-            self.draw_text(f"Meta: Chegar ao CIn com {REQUIRED_BADGES} crachás!", self.font, WHITE, SCREEN_WIDTH/2, 140)
+            
             self.draw_text("Escolha seu Personagem:", self.home_font, SHADOWCOLOR, SCREEN_WIDTH/2 + OFFSET, 480 + OFFSET)
             self.draw_text("Escolha seu Personagem:", self.home_font, WHITE, SCREEN_WIDTH/2, 480)
 
@@ -436,15 +607,10 @@ class Game:
             
             pygame.display.flip()
 
-    # --- TELA DE DIFICULDADE ATUALIZADA ---
+    # --- DIFICULDADE (CORRIGIDO: POSIÇÃO DO TÍTULO EMBAIXO) ---
     def show_difficulty_screen(self):
-        # Texto, Multiplicador
-        # FÁCIL = 0.6x (Bem lento)
-        # MÉDIO = 1.2x (Levemente desafiador)
-        # DIFÍCIL = 2.0x (Rápido e vai mudar o mapa no generate_map_layout)
         options = [("FÁCIL", 0.6), ("MÉDIO", 1.2), ("DIFÍCIL", 2.0)]
         index = 1 
-        
         waiting = True
         self.difficulty_multiplier = 1.0
         
@@ -452,12 +618,10 @@ class Game:
         
         while waiting:
             self.clock.tick(FPS)
-            
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     self.running = False
                     waiting = False
-                
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_UP or event.key == pygame.K_w:
                         self.play_sound("jump")
@@ -468,24 +632,33 @@ class Game:
                     elif event.key == pygame.K_RETURN or event.key == pygame.K_SPACE:
                         self.play_sound("collect")
                         self.difficulty_multiplier = options[index][1]
+                        
+                        if self.difficulty_multiplier >= 2.0: 
+                            self.required_badges = 3  
+                        else:
+                            self.required_badges = 8  
+                        
                         waiting = False
 
             self.screen.blit(self.background_image, (0, 0))
             
-            self.draw_text("SELECIONE A DIFICULDADE", self.alert_font, SHADOWCOLOR, SCREEN_WIDTH/2 + 2, 150 + 2)
-            self.draw_text("SELECIONE A DIFICULDADE", self.alert_font, WHITE, SCREEN_WIDTH/2, 150)
+            # --- CORREÇÃO AQUI: Mudança do Y para 480 (embaixo, como pedido) ---
+            self.draw_text("SELECIONE A DIFICULDADE", self.alert_font, SHADOWCOLOR, SCREEN_WIDTH/2 + 2, 480 + 2)
+            self.draw_text("SELECIONE A DIFICULDADE", self.alert_font, WHITE, SCREEN_WIDTH/2, 480)
+            # -------------------------------------------------------------------
 
             for i, (text, mult) in enumerate(options):
                 color = (255, 255, 0) if i == index else WHITE
                 prefix = "> " if i == index else "  "
-                
                 pos_y = 300 + (i * 60)
-                # Destaque visual extra para o Difícil
-                if text == "DIFÍCIL" and i == index:
-                     text += " (MAIS ESTRADAS!)"
+                
+                if text == "DIFÍCIL":
+                     extra_info = " (Meta: 3 Crachás)"
+                else:
+                     extra_info = " (Meta: 8 Crachás)"
 
-                self.draw_text(f"{prefix}{text}", self.home_font, SHADOWCOLOR, SCREEN_WIDTH/2 + 2, pos_y + 2)
-                self.draw_text(f"{prefix}{text}", self.home_font, color, SCREEN_WIDTH/2, pos_y)
+                self.draw_text(f"{prefix}{text}{extra_info}", self.home_font, SHADOWCOLOR, SCREEN_WIDTH/2 + 2, pos_y + 2)
+                self.draw_text(f"{prefix}{text}{extra_info}", self.home_font, color, SCREEN_WIDTH/2, pos_y)
 
             pygame.display.flip()
 
@@ -493,8 +666,8 @@ class Game:
         self.screen.blit(self.gameover_image, (0, 0))
         if self.idle_frames >= 5 * 60:
             motivo = "Você ficou parado muito tempo!"
-        elif self.score < REQUIRED_BADGES and self.distance_traveled >= GOAL_DISTANCE:
-            motivo = f"Faltaram crachás! {self.score}/{REQUIRED_BADGES}"
+        elif self.score < self.required_badges and self.distance_traveled >= GOAL_DISTANCE:
+            motivo = f"Faltaram crachás! {self.score}/{self.required_badges}"
         else:
             motivo = "Game Over!"
 
@@ -511,8 +684,8 @@ class Game:
         self.screen.blit(self.aprovado_image, (0, 0))
         self.draw_text("APROVADO!", self.gameover_font, SHADOWCOLOR, SCREEN_WIDTH/2 + OFFSET, SCREEN_HEIGHT/4 + OFFSET)
         self.draw_text("APROVADO!", self.gameover_font, (142, 248, 67), SCREEN_WIDTH/2, SCREEN_HEIGHT/4)
-        self.draw_text(f"Crachás: {self.score}", self.alert_font, SHADOWCOLOR, SCREEN_WIDTH/2 + OFFSET_SMALL, SCREEN_HEIGHT/2 + OFFSET_SMALL)
-        self.draw_text(f"Crachás: {self.score}", self.alert_font, WHITE, SCREEN_WIDTH/2, SCREEN_HEIGHT/2)
+        self.draw_text(f"Crachás: {self.score}/{self.required_badges}", self.alert_font, SHADOWCOLOR, SCREEN_WIDTH/2 + OFFSET_SMALL, SCREEN_HEIGHT/2 + OFFSET_SMALL)
+        self.draw_text(f"Crachás: {self.score}/{self.required_badges}", self.alert_font, WHITE, SCREEN_WIDTH/2, SCREEN_HEIGHT/2)
         self.draw_text("Tecle para reiniciar", self.alert_font, SHADOWCOLOR, SCREEN_WIDTH/2 + OFFSET_SMALL, SCREEN_HEIGHT * 3/4 + OFFSET_SMALL)
         self.draw_text("Tecle para reiniciar", self.alert_font, WHITE, SCREEN_WIDTH/2, SCREEN_HEIGHT * 3/4)
         pygame.display.flip()
@@ -575,14 +748,14 @@ class Game:
         badge_y = 10
         self.screen.blit(self.icon_badge_black, (badge_x, badge_y))
         
-        ratio = min(self.score / REQUIRED_BADGES, 1.0) 
+        ratio = min(self.score / self.required_badges, 1.0) 
         if ratio > 0:
             pixel_height = int(32 * ratio) 
             rect_area = (0, 32 - pixel_height, 32, pixel_height)
             self.screen.blit(self.icon_badge_color, (badge_x, badge_y + (32 - pixel_height)), area=rect_area)
 
-        cor_score = (0, 180, 0) if self.score >= REQUIRED_BADGES else BLACK
-        self.draw_text(f"{self.score}/{REQUIRED_BADGES}", self.font, cor_score, badge_x + 60, badge_y + 5)
+        cor_score = (0, 180, 0) if self.score >= self.required_badges else BLACK
+        self.draw_text(f"{self.score}/{self.required_badges}", self.font, cor_score, badge_x + 60, badge_y + 5)
 
         if self.slow_motion_timer > 0:
             segundos = (self.slow_motion_timer // 60) + 1
@@ -597,8 +770,20 @@ class Game:
 
     def run(self):
         while self.running:
-            if self.state == START:
-                self.show_start_screen()
+            if self.state == MENU:
+                self.show_main_menu()
+            
+            elif self.state == SETTINGS:
+                self.show_settings_screen()
+            
+            elif self.state == TUTORIAL:
+                self.show_tutorial_screen()
+
+            elif self.state == CREDITS:
+                self.show_credits_screen()
+
+            elif self.state == CHARACTER_SELECT:
+                self.show_character_select()
                 if self.running:
                     self.state = DIFFICULTY_SELECT
             
@@ -610,11 +795,11 @@ class Game:
             
             elif self.state == GAME_OVER:
                 self.show_game_over_screen()
-                self.state = START
+                self.state = MENU 
             
             elif self.state == VICTORY:
                 self.show_victory_screen()
-                self.state = START
+                self.state = MENU 
             
             elif self.state == PLAYING:
                 self.handle_events()
