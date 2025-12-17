@@ -22,6 +22,7 @@ START = 0
 PLAYING = 1
 GAME_OVER = 2
 VICTORY = 3
+DIFFICULTY_SELECT = 4 
 
 class Game:
     def load_ui_images(self):
@@ -58,7 +59,6 @@ class Game:
 
             path_cin = os.path.join(img_dir, "cin_predio.png")
             cin_surface = pygame.image.load(path_cin).convert_alpha()
-            # Ajuste o tamanho do prédio aqui se achar necessário
             self.cin_img = pygame.transform.scale(cin_surface, (400, 300))
             
         except Exception as e:
@@ -97,6 +97,7 @@ class Game:
         
         self.state = START
         self.running = True
+        self.difficulty_multiplier = 1.0 # Padrão
 
         self.sounds = {}
         if self.sound_enabled:
@@ -112,7 +113,8 @@ class Game:
                 if "jump" in self.sounds: self.sounds["jump"].set_volume(0.3)
             except: pass
 
-        self.map_layout = self.generate_map_layout()
+        # REMOVIDO DAQUI: self.map_layout = self.generate_map_layout()
+        # O mapa agora é gerado no new_game() para considerar a dificuldade escolhida
 
     def play_sound(self, name):
         if self.sound_enabled and name in self.sounds:
@@ -120,23 +122,40 @@ class Game:
             except: pass
 
     def generate_map_layout(self):
+        """ Gera o mapa considerando a dificuldade atual """
         layout = []
-        # Gera o mapa normal (aleatório)
+        
+        # --- LÓGICA DE DIFICULDADE DO MAPA ---
+        # Se dificuldade > 1.5 (Difícil), chance de estrada aumenta drasticamente
+        is_hard_mode = self.difficulty_multiplier >= 1.5
+        
+        chance_road = 0.8 if is_hard_mode else 0.5  # 80% chance de estrada no difícil
+        min_road_block = 3 if is_hard_mode else 2   # Blocos de estrada maiores no difícil
+        max_road_block = 8 if is_hard_mode else 5
+        # -------------------------------------
+
+        # Gera o mapa inicial (grama segura)
         for _ in range(10): layout.append(ROW_GRASS)
+        
         while len(layout) < TOTAL_ROWS:
-            if random.random() < 0.5:
-                num = random.randint(2, 5)
+            if random.random() < chance_road:
+                # Gera bloco de estrada
+                num = random.randint(min_road_block, max_road_block)
                 for _ in range(num): layout.append(ROW_ROAD)
             else:
-                num = random.randint(1, 3)
+                # Gera bloco de grama (descanso)
+                num = random.randint(1, 3) # Grama é curta
                 for _ in range(num): layout.append(ROW_GRASS)
         
-        # Garante grama no início
+        # Garante grama no final (meta)
         for i in range(1, 8):
             layout[-i] = ROW_GRASS
         return layout
 
     def new_game(self):
+        # 1. Gera o mapa AGORA, sabendo a dificuldade escolhida
+        self.map_layout = self.generate_map_layout()
+
         self.all_sprites = pygame.sprite.Group()
         self.obstacles = pygame.sprite.Group()
         self.items = pygame.sprite.Group()
@@ -178,15 +197,13 @@ class Game:
         self.spawn_static_objects()
 
     def spawn_static_objects(self):
-        # Lógica de spawn baseada no mapa
         rows_remaining = len(self.map_layout) - 1 - self.distance_traveled
         rows_on_screen = SCREEN_HEIGHT // BLOCK_SIZE
         target_row_index = int(rows_remaining - rows_on_screen)
         
         if target_row_index < 0: return 
         
-        # Lógica de metros percorridos
-        current_meter = self.distance_traveled + rows_on_screen # Topo da tela
+        current_meter = self.distance_traveled + rows_on_screen 
         if current_meter >= GOAL_DISTANCE:
             return
 
@@ -232,17 +249,21 @@ class Game:
                 if random.random() < 0.05:
                     direction = "left" if logical_index % 2 == 0 else "right"
                     progress = self.distance_traveled / GOAL_DISTANCE
-                    dificuldade = 1.0 + (progress * 1.5)
+                    
+                    # --- CÁLCULO DE VELOCIDADE ---
+                    base_dificuldade = 1.0 + (progress * 1.5)
+                    final_difficulty = base_dificuldade * self.difficulty_multiplier
 
                     obs = Obstacle(
                         random.choice(["carro", "carro", "circular"]), 
-                        speed_multiplier=dificuldade,
+                        speed_multiplier=final_difficulty,
                         fixed_y=screen_y,
                         fixed_direction=direction
                     )
                     
                     self.all_sprites.add(obs)
                     self.obstacles.add(obs)
+                    # Timer aleatório para não spawnar carro em cima de carro
                     self.lane_timers[logical_index] = random.randint(90, 200)
 
     def check_collisions(self):
@@ -341,20 +362,15 @@ class Game:
                 else:
                     pygame.draw.rect(self.screen, (50, 50, 50), (0, screen_y, SCREEN_WIDTH, BLOCK_SIZE))
 
-        # --- 2. DESENHA O CIn (AJUSTE: 5 BLOCOS ACIMA) ---
+        # --- 2. DESENHA O CIn ---
         if self.cin_img:
             player_y_visual = SCREEN_HEIGHT - (2 * BLOCK_SIZE)
             blocks_to_go = GOAL_DISTANCE - self.distance_traveled
             finish_line_top_y = player_y_visual - (blocks_to_go * BLOCK_SIZE)
             
             cin_base_y = finish_line_top_y 
-            
-            # --- MUDANÇA AQUI ---
-            # Antes era 8, descemos 3 -> Agora são 5 blocos de altura
             offset_altura = 5 * BLOCK_SIZE
-            
             cin_draw_y = cin_base_y - self.cin_img.get_height() - offset_altura
-            
             cin_x = (SCREEN_WIDTH // 2) - (self.cin_img.get_width() // 2)
             
             self.screen.blit(self.cin_img, (cin_x, cin_draw_y))
@@ -418,6 +434,59 @@ class Game:
                 pygame.draw.rect(self.screen, (255, 0, 0), (x2-5, y2-5, 110, 110), 3)
                 self.selected_skin = "aluno2frente.png"
             
+            pygame.display.flip()
+
+    # --- TELA DE DIFICULDADE ATUALIZADA ---
+    def show_difficulty_screen(self):
+        # Texto, Multiplicador
+        # FÁCIL = 0.6x (Bem lento)
+        # MÉDIO = 1.2x (Levemente desafiador)
+        # DIFÍCIL = 2.0x (Rápido e vai mudar o mapa no generate_map_layout)
+        options = [("FÁCIL", 0.6), ("MÉDIO", 1.2), ("DIFÍCIL", 2.0)]
+        index = 1 
+        
+        waiting = True
+        self.difficulty_multiplier = 1.0
+        
+        pygame.event.clear()
+        
+        while waiting:
+            self.clock.tick(FPS)
+            
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    self.running = False
+                    waiting = False
+                
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_UP or event.key == pygame.K_w:
+                        self.play_sound("jump")
+                        index = (index - 1) % len(options)
+                    elif event.key == pygame.K_DOWN or event.key == pygame.K_s:
+                        self.play_sound("jump")
+                        index = (index + 1) % len(options)
+                    elif event.key == pygame.K_RETURN or event.key == pygame.K_SPACE:
+                        self.play_sound("collect")
+                        self.difficulty_multiplier = options[index][1]
+                        waiting = False
+
+            self.screen.blit(self.background_image, (0, 0))
+            
+            self.draw_text("SELECIONE A DIFICULDADE", self.alert_font, SHADOWCOLOR, SCREEN_WIDTH/2 + 2, 150 + 2)
+            self.draw_text("SELECIONE A DIFICULDADE", self.alert_font, WHITE, SCREEN_WIDTH/2, 150)
+
+            for i, (text, mult) in enumerate(options):
+                color = (255, 255, 0) if i == index else WHITE
+                prefix = "> " if i == index else "  "
+                
+                pos_y = 300 + (i * 60)
+                # Destaque visual extra para o Difícil
+                if text == "DIFÍCIL" and i == index:
+                     text += " (MAIS ESTRADAS!)"
+
+                self.draw_text(f"{prefix}{text}", self.home_font, SHADOWCOLOR, SCREEN_WIDTH/2 + 2, pos_y + 2)
+                self.draw_text(f"{prefix}{text}", self.home_font, color, SCREEN_WIDTH/2, pos_y)
+
             pygame.display.flip()
 
     def show_game_over_screen(self):
@@ -530,19 +599,29 @@ class Game:
         while self.running:
             if self.state == START:
                 self.show_start_screen()
-                self.new_game()
-                self.state = PLAYING
+                if self.running:
+                    self.state = DIFFICULTY_SELECT
+            
+            elif self.state == DIFFICULTY_SELECT:
+                self.show_difficulty_screen()
+                if self.running:
+                    self.new_game()
+                    self.state = PLAYING
+            
             elif self.state == GAME_OVER:
                 self.show_game_over_screen()
                 self.state = START
+            
             elif self.state == VICTORY:
                 self.show_victory_screen()
                 self.state = START
+            
             elif self.state == PLAYING:
                 self.handle_events()
                 self.update()
                 self.draw()
                 self.clock.tick(FPS)
+        
         pygame.quit()
         sys.exit()
 
