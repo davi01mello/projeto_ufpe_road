@@ -142,6 +142,20 @@ class Game:
         overlay.fill((0, 0, 0)) # Preto
         self.screen.blit(overlay, (0, 0))
 
+    # --- NOVO: TRANSIÇÃO DE TELA (FADE) ---
+    def fade_transition(self):
+        """Escurece a tela suavemente para criar transição"""
+        fade_surf = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+        fade_surf.fill((0, 0, 0))
+        
+        # Loop rápido de fade out (Aumenta opacidade do preto)
+        for alpha in range(0, 255, 15): 
+            fade_surf.set_alpha(alpha)
+            # Desenha sobre o que já estava na tela
+            self.screen.blit(fade_surf, (0, 0))
+            pygame.display.update()
+            pygame.time.delay(10) # Pequena pausa para o olho perceber
+
     def generate_map_layout(self):
         layout = []
         is_hard_mode = self.difficulty_multiplier >= 1.5
@@ -286,16 +300,23 @@ class Game:
 
         hit_obstacle = pygame.sprite.spritecollideany(self.player, self.obstacles)
         if hit_obstacle:
-            self.play_sound("hit")
+            # --- ATUALIZAÇÃO DA COLISÃO ---
+            # Agora verificamos o retorno do método check_damage do Player
+            # Se retornar False, é porque o escudo ou invencibilidade protegeu
             tomou_dano = self.player.check_damage()
-            hit_obstacle.kill()
+            
+            # Só remove o obstáculo e toca som se tomou dano real 
+            # (para evitar que o obstáculo suma só de encostar se estiver invencível)
             if tomou_dano:
+                self.play_sound("hit")
+                hit_obstacle.kill()
                 if self.player.lives > 0:
                     self.player.reset_position()
                 else:
                     if self.sound_enabled: pygame.mixer.music.stop()
                     self.play_sound("game_over")
                     self.state = GAME_OVER
+            # Se não tomou dano (escudo ou invencível), não faz nada (obstáculo passa)
 
         collected_item = pygame.sprite.spritecollideany(self.player, self.items)
         if collected_item:
@@ -385,7 +406,7 @@ class Game:
         rect.midtop = (x, y)
         self.screen.blit(img, rect)
 
-    # --- MENU PRINCIPAL ---
+    # --- MENU PRINCIPAL (COM FADE E OPÇÕES COMPLETAS) ---
     def show_main_menu(self):
         options = ["INICIAR JOGO", "COMO JOGAR", "CONFIGURAÇÕES", "CRÉDITOS", "SAIR"]
         index = 0
@@ -411,6 +432,8 @@ class Game:
                         index = (index + 1) % len(options)
                     elif event.key == pygame.K_RETURN:
                         self.play_sound("collect")
+                        # --- FADE ANTES DE MUDAR ---
+                        self.fade_transition()
                         if index == 0: self.state = CHARACTER_SELECT
                         elif index == 1: self.state = TUTORIAL
                         elif index == 2: self.state = SETTINGS
@@ -423,16 +446,14 @@ class Game:
             for i, text in enumerate(options):
                 color = (255, 255, 0) if i == index else WHITE
                 prefix = "> " if i == index else "  "
-                
                 pos_y = 280 + (i * 50) 
                 self.draw_text(f"{prefix}{text}", self.home_font, SHADOWCOLOR, SCREEN_WIDTH/2+2, pos_y+2)
                 self.draw_text(f"{prefix}{text}", self.home_font, color, SCREEN_WIDTH/2, pos_y)
             
             pygame.display.flip()
 
-    # --- CONFIGURAÇÕES (COM OVERLAY ESCURO) ---
+    # --- CONFIGURAÇÕES (COM OVERLAY E FADE) ---
     def show_settings_screen(self):
-        options = ["VOLTAR"]
         waiting = True
         pygame.event.clear()
 
@@ -444,6 +465,7 @@ class Game:
                     self.running = False
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:
+                        self.fade_transition()
                         self.state = MENU 
                         waiting = False
                     
@@ -460,7 +482,7 @@ class Game:
                         self.update_sound_volumes()
 
             self.screen.blit(self.background_image, (0, 0))
-            self.draw_dim_overlay() # <--- APLICA O FILTRO ESCURO
+            self.draw_dim_overlay() 
             
             self.draw_text("CONFIGURAÇÕES", self.alert_font, WHITE, SCREEN_WIDTH/2, 80)
 
@@ -478,7 +500,7 @@ class Game:
 
             pygame.display.flip()
 
-    # --- TUTORIAL (COM OVERLAY ESCURO) ---
+    # --- TUTORIAL (COM OVERLAY E FADE) ---
     def show_tutorial_screen(self):
         waiting = True
         pygame.event.clear()
@@ -491,35 +513,31 @@ class Game:
                     self.running = False
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE or event.key == pygame.K_RETURN:
+                        self.fade_transition()
                         self.state = MENU
                         waiting = False
 
             self.screen.blit(self.background_image, (0, 0))
-            self.draw_dim_overlay() # <--- APLICA O FILTRO ESCURO
+            self.draw_dim_overlay() 
             
             self.draw_text("COMO JOGAR", self.alert_font, WHITE, SCREEN_WIDTH/2, 50)
             
-            # Controles
             self.draw_text("Use as SETAS ou WASD para mover.", self.font, WHITE, SCREEN_WIDTH/2, 110)
             self.draw_text("Desvie dos carros e obras!", self.font, WHITE, SCREEN_WIDTH/2, 150)
             
-            # Ícones e Explicações
-            # Crachá
             self.screen.blit(self.icon_badge_color, (150, 230))
             self.draw_text("CRACHÁ: Pontuação para passar.", self.small_font, (200,200,200), SCREEN_WIDTH/2 + 20, 240)
 
-            # Escudo
             self.screen.blit(self.icon_shield_color, (150, 310))
             self.draw_text("CAPACETE: Protege de 1 dano.", self.small_font, (200,200,200), SCREEN_WIDTH/2 + 20, 320)
 
-            # Energético
             self.screen.blit(self.icon_refri, (150, 390))
             self.draw_text("ENERGÉTICO: Câmera Lenta (5s).", self.small_font, (200,200,200), SCREEN_WIDTH/2 + 20, 400)
 
             self.draw_text("Pressione ENTER para voltar", self.font, (255, 255, 0), SCREEN_WIDTH/2, 520)
             pygame.display.flip()
 
-    # --- CRÉDITOS (COM OVERLAY ESCURO) ---
+    # --- CRÉDITOS (COM OVERLAY E FADE) ---
     def show_credits_screen(self):
         waiting = True
         pygame.event.clear()
@@ -541,11 +559,12 @@ class Game:
                     self.running = False
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE or event.key == pygame.K_RETURN:
+                        self.fade_transition()
                         self.state = MENU
                         waiting = False
 
             self.screen.blit(self.background_image, (0, 0))
-            self.draw_dim_overlay() # <--- APLICA O FILTRO ESCURO
+            self.draw_dim_overlay() 
             
             self.draw_text("CRÉDITOS", self.alert_font, WHITE, SCREEN_WIDTH/2, 60)
             self.draw_text("Equipe de Desenvolvimento:", self.font, (200,200,200), SCREEN_WIDTH/2, 120)
@@ -585,6 +604,7 @@ class Game:
                         self.play_sound("jump")
                     elif event.key == pygame.K_RETURN:
                         self.play_sound("collect")
+                        self.fade_transition() # Transição ao escolher
                         waiting = False
 
             self.screen.blit(self.background_image, (0, 0))
@@ -607,7 +627,6 @@ class Game:
             
             pygame.display.flip()
 
-    # --- DIFICULDADE (CORRIGIDO: POSIÇÃO DO TÍTULO EMBAIXO) ---
     def show_difficulty_screen(self):
         options = [("FÁCIL", 0.6), ("MÉDIO", 1.2), ("DIFÍCIL", 2.0)]
         index = 1 
@@ -638,14 +657,13 @@ class Game:
                         else:
                             self.required_badges = 8  
                         
+                        self.fade_transition() # Transição ao começar
                         waiting = False
 
             self.screen.blit(self.background_image, (0, 0))
             
-            # --- CORREÇÃO AQUI: Mudança do Y para 480 (embaixo, como pedido) ---
             self.draw_text("SELECIONE A DIFICULDADE", self.alert_font, SHADOWCOLOR, SCREEN_WIDTH/2 + 2, 480 + 2)
             self.draw_text("SELECIONE A DIFICULDADE", self.alert_font, WHITE, SCREEN_WIDTH/2, 480)
-            # -------------------------------------------------------------------
 
             for i, (text, mult) in enumerate(options):
                 color = (255, 255, 0) if i == index else WHITE
@@ -701,6 +719,7 @@ class Game:
                     waiting = False
                     self.running = False
                 if event.type == pygame.KEYDOWN:
+                    self.fade_transition() # Fade ao sair da tela de vitória/derrota
                     waiting = False
 
     def update(self):

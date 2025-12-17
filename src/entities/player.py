@@ -1,39 +1,41 @@
 import pygame
 import os
 from src.config import BLOCK_SIZE, SCREEN_WIDTH, SCREEN_HEIGHT
+from src.entities.entity_base import Entity
 
-class Player(pygame.sprite.Sprite):
+class Player(Entity):
     def __init__(self, start_grid_x, start_grid_y, skin_filename):
-        super().__init__()
-
+        # Inicializa a Entity
+        super().__init__(start_grid_x * BLOCK_SIZE, start_grid_y * BLOCK_SIZE, 
+                         BLOCK_SIZE, BLOCK_SIZE, (0, 0, 255), None)
+        
         self.grid_x = start_grid_x
         self.grid_y = start_grid_y
+        
         self.lives = 3             
-        self.has_shield = False
+        self.has_shield = False    
+        
+        # --- NOVO: INVENCIBILIDADE ---
+        self.invulnerable_timer = 0 # Tempo restante de invencibilidade
+        # -----------------------------
 
         self.images = {} 
         self.current_direction = None 
-
-        # --- LÓGICA DE NOME CORRIGIDA ---
-        # Seu arquivo vem como "aluno1frente.png".
-        # Vamos remover o "frente.png" para sobrar apenas "aluno1" ou "aluno2"
-        base_name = skin_filename.replace("frente.png", "")
         
+        base_name = skin_filename.replace("frente.png", "")
         self._load_all_images(base_name)
-
-        # Inicia olhando para frente
+        
         self.update_sprite("front")
+        
         self.rect = self.image.get_rect()
-
         self.rect.x = self.grid_x * BLOCK_SIZE
         self.rect.y = self.grid_y * BLOCK_SIZE
 
     def _load_all_images(self, base_name):
-        # Mapeia os sufixos EXATOS conforme seu print da pasta
         suffixes = {
-            "front": "frente.png",   # aluno1 + frente.png
-            "back":  "costas.png",   # aluno1 + costas.png
-            "side":  "lado.png"      # aluno1 + lado.png
+            "front": "frente.png",
+            "back":  "costas.png",
+            "side":  "lado.png"
         }
 
         for direction, suffix in suffixes.items():
@@ -44,13 +46,10 @@ class Player(pygame.sprite.Sprite):
                 scaled_img = pygame.transform.scale(loaded_img, (BLOCK_SIZE, BLOCK_SIZE))
                 self.images[direction] = scaled_img
             except Exception as e:
-                print(f"Erro ao carregar {full_name}: {e}")
-                # Cria quadrado de erro se falhar
                 surf = pygame.Surface((BLOCK_SIZE, BLOCK_SIZE))
                 surf.fill((255, 0, 0))
                 self.images[direction] = surf
 
-    # --- A FUNÇÃO QUE FALTAVA ---
     def update_sprite(self, direction, flip_x=False):
         state_id = f"{direction}_{flip_x}"
         if self.current_direction != state_id:
@@ -63,13 +62,11 @@ class Player(pygame.sprite.Sprite):
             self.current_direction = state_id
 
     def move(self, dx, dy):
-        # Atualiza visual
         if dx > 0:   self.update_sprite("side", flip_x=False)
         elif dx < 0: self.update_sprite("side", flip_x=True)
         elif dy < 0: self.update_sprite("back")
         elif dy > 0: self.update_sprite("front")
 
-        # Atualiza posição lógica
         new_x = self.grid_x + dx
         new_y = self.grid_y + dy
         
@@ -88,11 +85,41 @@ class Player(pygame.sprite.Sprite):
         self.rect.x = self.grid_x * BLOCK_SIZE
         self.rect.y = self.grid_y * BLOCK_SIZE
         self.update_sprite("front")
+        
+        # Ao renascer, ganha invencibilidade breve (2 segundos)
+        self.invulnerable_timer = 120 
 
     def check_damage(self):
-        if self.has_shield:
-            self.has_shield = False
+        """Retorna True se tomou dano real, False se foi protegido"""
+        
+        # 1. Se já está invulnerável (piscando), não toma dano
+        if self.invulnerable_timer > 0:
             return False
+
+        # 2. Se tem escudo, usa o escudo e ganha invencibilidade breve
+        if self.has_shield:
+            print("🛡️ ESCUDO PROTEGEU!")
+            self.has_shield = False 
+            self.invulnerable_timer = 60 # 1 segundo de proteção pós-quebra
+            return False 
+        
+        # 3. Toma dano real
         else:
             self.lives -= 1
-            return True
+            print(f"💔 DANO! Vidas restantes: {self.lives}")
+            self.invulnerable_timer = 120 # 2 segundos invencível após morrer/renascer
+            return True 
+
+    def update(self):
+        # Lógica de Invencibilidade (Piscar)
+        if self.invulnerable_timer > 0:
+            self.invulnerable_timer -= 1
+            
+            # Pisca a cada 5 frames
+            if (self.invulnerable_timer // 5) % 2 == 0:
+                self.image.set_alpha(50) # Quase transparente
+            else:
+                self.image.set_alpha(255) # Visível
+        else:
+            # Garante que está visível se timer acabou
+            self.image.set_alpha(255)
