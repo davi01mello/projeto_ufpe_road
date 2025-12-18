@@ -9,7 +9,7 @@ from src.entities.collectibles import BadgeFragment, EnergyDrink, Shield
 
 # --- CONFIGURAÇÃO GERAL ---
 GOAL_DISTANCE = 100 
-TOTAL_ROWS = GOAL_DISTANCE + 50 # Buffer de segurança
+TOTAL_ROWS = GOAL_DISTANCE + 50 
 
 # Tipos de Linha
 ROW_GRASS = 0
@@ -29,7 +29,6 @@ CREDITS = 8
 
 class Game:
     def load_ui_images(self):
-        """Carrega ícones usando caminho absoluto para evitar erros"""
         import os 
         
         base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -74,7 +73,10 @@ class Game:
         self.icon_badge_black = create_black_version_for_badge(self.icon_badge_color)
         self.icon_shield_color = load_and_scale("capacete.png")
         self.icon_shield_black = load_and_scale("capacete_LOCK.png") 
-        self.icon_refri = load_and_scale("raio.png")
+        self.icon_refri_color = load_and_scale("raio.png")
+        self.icon_refri_lock = load_and_scale("raio_LOCK.png")
+        self.icon_heart_full = load_and_scale("coracao_cheio.png")
+        self.icon_heart_empty = load_and_scale("coracao_vazio.png")
 
     def __init__(self):
         pygame.init()
@@ -92,7 +94,6 @@ class Game:
         pygame.display.set_caption("CIn Road: Rumo ao Diploma")
         self.clock = pygame.time.Clock()
         
-        # Fontes
         self.font = pygame.font.SysFont("assets/fonts/PressStart2P.ttf", 24)
         self.small_font = pygame.font.SysFont("assets/fonts/PressStart2P.ttf", 18) 
         self.title_font = pygame.font.SysFont("assets/fonts/PressStart2P.ttf", 48, bold=True)
@@ -134,27 +135,24 @@ class Game:
             try: self.sounds[name].play()
             except: pass
 
-    # --- NOVO MÉTODO VISUAL: OVERLAY ESCURO ---
+
     def draw_dim_overlay(self):
-        """Desenha uma tela preta semi-transparente para melhorar a leitura"""
+
         overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
-        overlay.set_alpha(200) # Transparência (0 a 255). 200 é bem escuro.
-        overlay.fill((0, 0, 0)) # Preto
+        overlay.set_alpha(200)
+        overlay.fill((0, 0, 0))
         self.screen.blit(overlay, (0, 0))
 
-    # --- NOVO: TRANSIÇÃO DE TELA (FADE) ---
+
     def fade_transition(self):
-        """Escurece a tela suavemente para criar transição"""
         fade_surf = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
         fade_surf.fill((0, 0, 0))
         
-        # Loop rápido de fade out (Aumenta opacidade do preto)
         for alpha in range(0, 255, 15): 
             fade_surf.set_alpha(alpha)
-            # Desenha sobre o que já estava na tela
             self.screen.blit(fade_surf, (0, 0))
             pygame.display.update()
-            pygame.time.delay(10) # Pequena pausa para o olho perceber
+            pygame.time.delay(10)
 
     def generate_map_layout(self):
         layout = []
@@ -162,17 +160,14 @@ class Game:
         chance_road = 0.8 if is_hard_mode else 0.5  
         min_road_block = 3 if is_hard_mode else 2   
         max_road_block = 8 if is_hard_mode else 5
-
         for _ in range(10): layout.append(ROW_GRASS)
-        
         while len(layout) < TOTAL_ROWS:
             if random.random() < chance_road:
                 num = random.randint(min_road_block, max_road_block)
                 for _ in range(num): layout.append(ROW_ROAD)
             else:
                 num = random.randint(1, 3) 
-                for _ in range(num): layout.append(ROW_GRASS)
-        
+                for _ in range(num): layout.append(ROW_GRASS) 
         for i in range(1, 8):
             layout[-i] = ROW_GRASS
         return layout
@@ -234,12 +229,12 @@ class Game:
 
         if row_type == ROW_GRASS:
             if random.random() < 0.8:
-                if random.random() < 0.1:
+                if random.random() < 0.45:
                     obs = Obstacle("obra", fixed_y=-BLOCK_SIZE)
                     self.all_sprites.add(obs)
                     self.obstacles.add(obs)
                 else:
-                    item_class = random.choices([BadgeFragment, EnergyDrink, Shield], weights=[80, 10, 10], k=1)[0]
+                    item_class = random.choices([BadgeFragment, EnergyDrink, Shield], weights=[70, 15, 15], k=1)[0]
                     item = item_class()
                     item.rect.y = -BLOCK_SIZE 
                     self.all_sprites.add(item)
@@ -300,13 +295,7 @@ class Game:
 
         hit_obstacle = pygame.sprite.spritecollideany(self.player, self.obstacles)
         if hit_obstacle:
-            # --- ATUALIZAÇÃO DA COLISÃO ---
-            # Agora verificamos o retorno do método check_damage do Player
-            # Se retornar False, é porque o escudo ou invencibilidade protegeu
             tomou_dano = self.player.check_damage()
-            
-            # Só remove o obstáculo e toca som se tomou dano real 
-            # (para evitar que o obstáculo suma só de encostar se estiver invencível)
             if tomou_dano:
                 self.play_sound("hit")
                 hit_obstacle.kill()
@@ -316,7 +305,6 @@ class Game:
                     if self.sound_enabled: pygame.mixer.music.stop()
                     self.play_sound("game_over")
                     self.state = GAME_OVER
-            # Se não tomou dano (escudo ou invencível), não faz nada (obstáculo passa)
 
         collected_item = pygame.sprite.spritecollideany(self.player, self.items)
         if collected_item:
@@ -406,7 +394,6 @@ class Game:
         rect.midtop = (x, y)
         self.screen.blit(img, rect)
 
-    # --- MENU PRINCIPAL (COM FADE E OPÇÕES COMPLETAS) ---
     def show_main_menu(self):
         options = ["INICIAR JOGO", "COMO JOGAR", "CONFIGURAÇÕES", "CRÉDITOS", "SAIR"]
         index = 0
@@ -432,7 +419,6 @@ class Game:
                         index = (index + 1) % len(options)
                     elif event.key == pygame.K_RETURN:
                         self.play_sound("collect")
-                        # --- FADE ANTES DE MUDAR ---
                         self.fade_transition()
                         if index == 0: self.state = CHARACTER_SELECT
                         elif index == 1: self.state = TUTORIAL
@@ -452,7 +438,6 @@ class Game:
             
             pygame.display.flip()
 
-    # --- CONFIGURAÇÕES (COM OVERLAY E FADE) ---
     def show_settings_screen(self):
         waiting = True
         pygame.event.clear()
@@ -500,7 +485,6 @@ class Game:
 
             pygame.display.flip()
 
-    # --- TUTORIAL (COM OVERLAY E FADE) ---
     def show_tutorial_screen(self):
         waiting = True
         pygame.event.clear()
@@ -537,7 +521,6 @@ class Game:
             self.draw_text("Pressione ENTER para voltar", self.font, (255, 255, 0), SCREEN_WIDTH/2, 520)
             pygame.display.flip()
 
-    # --- CRÉDITOS (COM OVERLAY E FADE) ---
     def show_credits_screen(self):
         waiting = True
         pygame.event.clear()
@@ -719,7 +702,7 @@ class Game:
                     waiting = False
                     self.running = False
                 if event.type == pygame.KEYDOWN:
-                    self.fade_transition() # Fade ao sair da tela de vitória/derrota
+                    self.fade_transition() 
                     waiting = False
 
     def update(self):
@@ -745,46 +728,53 @@ class Game:
     def draw(self):
         self.draw_background()
         self.all_sprites.draw(self.screen)
-        
-        # HUD
-        self.draw_text(f"Vidas: {self.player.lives}", self.font, BLACK, 60, 10)
-
-        distancia = max(0, GOAL_DISTANCE - self.distance_traveled)
-        self.draw_text(f"Faltam: {distancia}m", self.font, (0, 0, 255), SCREEN_WIDTH/2, 10)
-
-        shield_x, shield_y = 150, 10 
+        # 1. VIDAS (Corações)
+        start_x, start_y = 20, 10  
+        spacing = 38
+        for i in range(3):
+            if i < self.player.lives:
+                self.screen.blit(self.icon_heart_full, (start_x + (i * spacing), start_y))
+            else:
+                self.screen.blit(self.icon_heart_empty, (start_x + (i * spacing), start_y))
+        # 2. ESCUDO
+        shield_x, shield_y = 160, 10 
         if self.player.has_shield:
             self.screen.blit(self.icon_shield_color, (shield_x, shield_y))
-            txt_color = (0, 180, 0)
-            status = "ATIVO"
+            self.draw_text("ATIVO", self.font, (0, 180, 0), shield_x + 57, shield_y + 7)
         else:
             self.screen.blit(self.icon_shield_black, (shield_x, shield_y))
-            txt_color = BLACK
-            status = "OFF"
-        self.draw_text(status, self.font, txt_color, shield_x + 60, shield_y + 5)
+            self.draw_text("OFF", self.font, BLACK, shield_x + 57, shield_y + 7)
+        # 3. REFRI / SLOW MOTION
+        refri_x, refri_y = 320, 10 
+        
+        if self.slow_motion_timer > 0:
+            segundos = (self.slow_motion_timer // 60) + 1
+            refri_mei = SCREEN_WIDTH/2 - 185
+            self.screen.blit(self.icon_refri_color, (refri_mei, 80)) 
+            self.draw_text(f"ENERGIZADO: {segundos}s", self.title_font, (0, 255, 255), SCREEN_WIDTH/2 + 20, 80)
 
+            self.screen.blit(self.icon_refri_color, (refri_x, refri_y))
+            self.draw_text("ON", self.font, (0, 200, 255), refri_x + 45, refri_y + 10)
+            
+        else:
+            self.screen.blit(self.icon_refri_lock, (refri_x, refri_y))
+            self.draw_text("OFF", self.font, BLACK, refri_x + 45, refri_y + 10)
+        # 4. META DISTÂNCIA
+        distancia = max(0, GOAL_DISTANCE - self.distance_traveled)
+        self.draw_text(f"Meta: {distancia}m", self.font, (0, 0, 255), SCREEN_WIDTH/2 + 50, 10)
+        # 5. CRACHÁ
         badge_x = SCREEN_WIDTH - 140
         badge_y = 10
         self.screen.blit(self.icon_badge_black, (badge_x, badge_y))
-        
         ratio = min(self.score / self.required_badges, 1.0) 
         if ratio > 0:
             pixel_height = int(32 * ratio) 
             rect_area = (0, 32 - pixel_height, 32, pixel_height)
             self.screen.blit(self.icon_badge_color, (badge_x, badge_y + (32 - pixel_height)), area=rect_area)
-
         cor_score = (0, 180, 0) if self.score >= self.required_badges else BLACK
         self.draw_text(f"{self.score}/{self.required_badges}", self.font, cor_score, badge_x + 60, badge_y + 5)
-
-        if self.slow_motion_timer > 0:
-            segundos = (self.slow_motion_timer // 60) + 1
-            refri_x = SCREEN_WIDTH/2 - 185
-            self.screen.blit(self.icon_refri, (refri_x, 80))
-            self.draw_text(f"ENERGIZADO: {segundos}s", self.title_font, (0, 255, 255), SCREEN_WIDTH/2 + 20, 80)
-            
-        elif self.idle_frames > 3 * 60:
+        if self.idle_frames > 3 * 60 and self.slow_motion_timer == 0:
             self.draw_text("MOVA-SE!", self.alert_font, (255, 0, 0), SCREEN_WIDTH/2, 80)
-
         pygame.display.flip()
 
     def run(self):
