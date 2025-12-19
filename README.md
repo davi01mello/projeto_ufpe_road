@@ -20,12 +20,12 @@
 
 O jogador deve avançar por um mapa gerado proceduralmente, desviando de **ônibus circulares**, **carros** e **obras**, enquanto gerencia seus recursos coletando **fragmentos de crachá** (pontuação), **energéticos** (efeito de câmera lenta) e **escudos** (proteção contra dano).
 
-[cite_start]O sistema foi construído rigorosamente sobre o paradigma de **Orientação a Objetos**, garantindo código modular e extensível[cite: 10, 15].
+O sistema foi construído rigorosamente sobre o paradigma de **Orientação a Objetos**, garantindo código modular e extensível.
 
 ---
 
 ## 📂 Arquitetura do Projeto
-[cite_start]O código foi organizado utilizando **Modularização** para separar responsabilidades e facilitar o trabalho em grupo[cite: 50]. A estrutura de arquivos final é:
+O código foi organizado utilizando **Modularização** para separar responsabilidades e facilitar o trabalho em grupo. A estrutura de arquivos final é:
 
 ```text
 projeto/
@@ -39,3 +39,31 @@ projeto/
 │       ├── obstacles.py     # Classe Obstacle: Lógica de tráfego, direção e velocidade variável.
 │       └── collectibles.py  # Classes Itens: BadgeFragment, EnergyDrink e Shield (Polimorfismo).
 └── assets/                  # Imagens e Sons
+
+---
+
+## Capturas de tela
+
+
+
+
+---
+
+## Ferramentas Ultilizadas
+
+
+
+---
+
+## Divisão do Trabalho
+
+
+
+--
+
+## Desafios e Erros
+Qual foi o maior erro cometido durante o projeto? Como vocês lidaram com ele?
+
+Qual foi o maior desafio enfrentado durante o projeto? Como vocês lidaram com ele?
+
+Quais as lições aprendidas durante o projeto?
