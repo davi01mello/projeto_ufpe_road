@@ -67,14 +67,11 @@ Encapsulamento:
 
 A classe Game centraliza e protege o estado do jogo (pontuação, vidas, mapa), impedindo acesso direto indevido de outras partes do código.
 
-
-
-
 ---
 ## 🛠️ Ferramentas Utilizadas
 
 * **Python** - Linguagem Base do Projeto
-* **PyGame** - Biblioteca utilizada para loops, eventos, sprites e renderizar 
+* **PyGame** - Biblioteca utilizada para loops de eventos, gerenciamento das sprites, colisões e renderização de gráficos 
 * **Git e Github** - Controle de Versão e Repositório
 * **VS Code** - Ambiente de desenvolvimento do código (IDE)
 * **Gemini** - Criação de Sprites
