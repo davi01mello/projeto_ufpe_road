@@ -7,16 +7,13 @@ from src.entities.player import Player
 from src.entities.obstacles import Obstacle
 from src.entities.collectibles import BadgeFragment, EnergyDrink, Shield
 
-# --- CONFIGURAÇÃO GERAL ---
 GOAL_DISTANCE = 100 
 TOTAL_ROWS = GOAL_DISTANCE + 50 
 
-# Tipos de Linha
 ROW_GRASS = 0
 ROW_ROAD = 1
 ROW_FINISH = 2
 
-# Estados do Jogo
 MENU = 0
 CHARACTER_SELECT = 1 
 PLAYING = 2
@@ -471,12 +468,10 @@ class Game:
             
             self.draw_text("CONFIGURAÇÕES", self.alert_font, WHITE, SCREEN_WIDTH/2, 80)
 
-            # Barra de Volume
             vol_perc = int(self.volume_level * 100)
             self.draw_text(f"VOLUME: {vol_perc}%", self.home_font, WHITE, SCREEN_WIDTH/2, 220)
             self.draw_text("(Setas Esq/Dir)", self.small_font, (200,200,200), SCREEN_WIDTH/2, 260)
 
-            # Tela Cheia Toggle
             status_tela = "LIGADO" if self.is_fullscreen else "DESLIGADO"
             self.draw_text(f"TELA CHEIA: {status_tela}", self.home_font, WHITE, SCREEN_WIDTH/2, 350)
             self.draw_text("(Pressione ENTER)", self.small_font, (200,200,200), SCREEN_WIDTH/2, 390)
@@ -728,7 +723,6 @@ class Game:
     def draw(self):
         self.draw_background()
         self.all_sprites.draw(self.screen)
-        # 1. VIDAS (Corações)
         start_x, start_y = 20, 10  
         spacing = 38
         for i in range(3):
@@ -736,7 +730,6 @@ class Game:
                 self.screen.blit(self.icon_heart_full, (start_x + (i * spacing), start_y))
             else:
                 self.screen.blit(self.icon_heart_empty, (start_x + (i * spacing), start_y))
-        # 2. ESCUDO
         shield_x, shield_y = 160, 10 
         if self.player.has_shield:
             self.screen.blit(self.icon_shield_color, (shield_x, shield_y))
@@ -744,7 +737,6 @@ class Game:
         else:
             self.screen.blit(self.icon_shield_black, (shield_x, shield_y))
             self.draw_text("OFF", self.font, BLACK, shield_x + 57, shield_y + 7)
-        # 3. REFRI / SLOW MOTION
         refri_x, refri_y = 320, 10 
         
         if self.slow_motion_timer > 0:
@@ -759,10 +751,8 @@ class Game:
         else:
             self.screen.blit(self.icon_refri_lock, (refri_x, refri_y))
             self.draw_text("OFF", self.font, BLACK, refri_x + 45, refri_y + 10)
-        # 4. META DISTÂNCIA
         distancia = max(0, GOAL_DISTANCE - self.distance_traveled)
         self.draw_text(f"Meta: {distancia}m", self.font, (0, 0, 255), SCREEN_WIDTH/2 + 50, 10)
-        # 5. CRACHÁ
         badge_x = SCREEN_WIDTH - 140
         badge_y = 10
         self.screen.blit(self.icon_badge_black, (badge_x, badge_y))
