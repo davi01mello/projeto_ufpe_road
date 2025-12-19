@@ -86,14 +86,17 @@ A classe Game centraliza e protege o estado do jogo (pontuação, vidas, mapa), 
 **Áudio e Imagens:**
 * Davi Rosendo
 * Davi Mello
+  
 **Lógica de movimentação e interação do player com o cenário (obstáculos e coletáveis):**
 * Gabriel Godoy
 * João Pedro
 * Davi Mello
+  
 **Mudança de estado do jogo e funcionamento dos menus:**
 * Davi Rosendo
 * Gabriel Godoy
 * João Pedro
+  
 **Suporte Geral e Apresentação:**
 * Vitor Nunes
 * João Felipe
