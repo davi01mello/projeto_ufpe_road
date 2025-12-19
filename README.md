@@ -39,7 +39,7 @@ projeto/
 │       ├── obstacles.py     # Classe Obstacle: Lógica de tráfego, direção e velocidade variável.
 │       └── collectibles.py  # Classes Itens: BadgeFragment, EnergyDrink e Shield (Polimorfismo).
 └── assets/                  # Imagens e Sons
-
+```
 ---
 
 ## Capturas de tela
