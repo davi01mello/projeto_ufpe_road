@@ -510,7 +510,7 @@ class Game:
             self.screen.blit(self.icon_shield_color, (150, 310))
             self.draw_text("CAPACETE: Protege de 1 dano.", self.small_font, (200,200,200), SCREEN_WIDTH/2 + 20, 320)
 
-            self.screen.blit(self.icon_refri, (150, 390))
+            self.screen.blit(self.icon_refri_color, (150, 390))
             self.draw_text("ENERGÉTICO: Câmera Lenta (5s).", self.small_font, (200,200,200), SCREEN_WIDTH/2 + 20, 400)
 
             self.draw_text("Pressione ENTER para voltar", self.font, (255, 255, 0), SCREEN_WIDTH/2, 520)
