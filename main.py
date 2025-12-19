@@ -135,14 +135,11 @@ class Game:
             try: self.sounds[name].play()
             except: pass
 
-
     def draw_dim_overlay(self):
-
         overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
         overlay.set_alpha(200)
         overlay.fill((0, 0, 0))
         self.screen.blit(overlay, (0, 0))
-
 
     def fade_transition(self):
         fade_surf = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
@@ -425,7 +422,9 @@ class Game:
                         elif index == 2: self.state = SETTINGS
                         elif index == 3: self.state = CREDITS
                         elif index == 4: self.running = False
-                        waiting = False
+                        # IMPORTANTE: Use return para sair da função imediatamente
+                        # Isso evita que o código continue e desenhe o menu por mais um frame
+                        return 
 
             self.screen.blit(self.background_image, (0, 0))
             
@@ -435,7 +434,6 @@ class Game:
                 pos_y = 280 + (i * 50) 
                 self.draw_text(f"{prefix}{text}", self.home_font, SHADOWCOLOR, SCREEN_WIDTH/2+2, pos_y+2)
                 self.draw_text(f"{prefix}{text}", self.home_font, color, SCREEN_WIDTH/2, pos_y)
-            
             pygame.display.flip()
 
     def show_settings_screen(self):
@@ -452,7 +450,7 @@ class Game:
                     if event.key == pygame.K_ESCAPE:
                         self.fade_transition()
                         self.state = MENU 
-                        waiting = False
+                        return # Sair imediatamente
                     
                     if event.key == pygame.K_RETURN:
                         self.play_sound("collect")
@@ -499,7 +497,7 @@ class Game:
                     if event.key == pygame.K_ESCAPE or event.key == pygame.K_RETURN:
                         self.fade_transition()
                         self.state = MENU
-                        waiting = False
+                        return # Sair imediatamente
 
             self.screen.blit(self.background_image, (0, 0))
             self.draw_dim_overlay() 
@@ -515,7 +513,8 @@ class Game:
             self.screen.blit(self.icon_shield_color, (150, 310))
             self.draw_text("CAPACETE: Protege de 1 dano.", self.small_font, (200,200,200), SCREEN_WIDTH/2 + 20, 320)
 
-            self.screen.blit(self.icon_refri, (150, 390))
+            # CORREÇÃO AQUI: icon_refri_color
+            self.screen.blit(self.icon_refri_color, (150, 390))
             self.draw_text("ENERGÉTICO: Câmera Lenta (5s).", self.small_font, (200,200,200), SCREEN_WIDTH/2 + 20, 400)
 
             self.draw_text("Pressione ENTER para voltar", self.font, (255, 255, 0), SCREEN_WIDTH/2, 520)
@@ -544,7 +543,7 @@ class Game:
                     if event.key == pygame.K_ESCAPE or event.key == pygame.K_RETURN:
                         self.fade_transition()
                         self.state = MENU
-                        waiting = False
+                        return # Sair imediatamente
 
             self.screen.blit(self.background_image, (0, 0))
             self.draw_dim_overlay() 
@@ -587,8 +586,8 @@ class Game:
                         self.play_sound("jump")
                     elif event.key == pygame.K_RETURN:
                         self.play_sound("collect")
-                        self.fade_transition() # Transição ao escolher
-                        waiting = False
+                        self.fade_transition()
+                        return # Sair imediatamente
 
             self.screen.blit(self.background_image, (0, 0))
             
@@ -640,8 +639,8 @@ class Game:
                         else:
                             self.required_badges = 8  
                         
-                        self.fade_transition() # Transição ao começar
-                        waiting = False
+                        self.fade_transition() 
+                        return # Sair imediatamente
 
             self.screen.blit(self.background_image, (0, 0))
             
@@ -728,15 +727,13 @@ class Game:
     def draw(self):
         self.draw_background()
         self.all_sprites.draw(self.screen)
-        # 1. VIDAS (Corações)
-        start_x, start_y = 20, 10  
-        spacing = 38
-        for i in range(3):
-            if i < self.player.lives:
-                self.screen.blit(self.icon_heart_full, (start_x + (i * spacing), start_y))
-            else:
-                self.screen.blit(self.icon_heart_empty, (start_x + (i * spacing), start_y))
-        # 2. ESCUDO
+        
+        # HUD
+        self.draw_text(f"Vidas: {self.player.lives}", self.font, BLACK, 60, 10)
+
+        distancia = max(0, GOAL_DISTANCE - self.distance_traveled)
+        self.draw_text(f"Faltam: {distancia}m", self.font, (0, 0, 255), SCREEN_WIDTH/2, 10)
+
         shield_x, shield_y = 160, 10 
         if self.player.has_shield:
             self.screen.blit(self.icon_shield_color, (shield_x, shield_y))
@@ -744,6 +741,7 @@ class Game:
         else:
             self.screen.blit(self.icon_shield_black, (shield_x, shield_y))
             self.draw_text("OFF", self.font, BLACK, shield_x + 57, shield_y + 7)
+
         # 3. REFRI / SLOW MOTION
         refri_x, refri_y = 320, 10 
         
@@ -759,22 +757,32 @@ class Game:
         else:
             self.screen.blit(self.icon_refri_lock, (refri_x, refri_y))
             self.draw_text("OFF", self.font, BLACK, refri_x + 45, refri_y + 10)
-        # 4. META DISTÂNCIA
-        distancia = max(0, GOAL_DISTANCE - self.distance_traveled)
-        self.draw_text(f"Meta: {distancia}m", self.font, (0, 0, 255), SCREEN_WIDTH/2 + 50, 10)
-        # 5. CRACHÁ
+
         badge_x = SCREEN_WIDTH - 140
         badge_y = 10
         self.screen.blit(self.icon_badge_black, (badge_x, badge_y))
+        
         ratio = min(self.score / self.required_badges, 1.0) 
         if ratio > 0:
             pixel_height = int(32 * ratio) 
             rect_area = (0, 32 - pixel_height, 32, pixel_height)
             self.screen.blit(self.icon_badge_color, (badge_x, badge_y + (32 - pixel_height)), area=rect_area)
+
         cor_score = (0, 180, 0) if self.score >= self.required_badges else BLACK
         self.draw_text(f"{self.score}/{self.required_badges}", self.font, cor_score, badge_x + 60, badge_y + 5)
+
         if self.idle_frames > 3 * 60 and self.slow_motion_timer == 0:
             self.draw_text("MOVA-SE!", self.alert_font, (255, 0, 0), SCREEN_WIDTH/2, 80)
+
+        # 1. VIDAS (Corações) - Desenhar por último pra garantir que fique por cima
+        start_x, start_y = 20, 10  
+        spacing = 38
+        for i in range(3):
+            if i < self.player.lives:
+                self.screen.blit(self.icon_heart_full, (start_x + (i * spacing), start_y))
+            else:
+                self.screen.blit(self.icon_heart_empty, (start_x + (i * spacing), start_y))
+
         pygame.display.flip()
 
     def run(self):
