@@ -16,7 +16,7 @@
 ---
 
 ## 📝 Sobre o Projeto
-**CIn Road** é um jogo de ação e estratégia 2D desenvolvido em Python com a biblioteca **PyGame**. Inspirado no clássico *Crossy Road*, o objetivo é guiar um estudante do CIn em uma jornada desafiadora até o diploma.
+**CIn Road** é um jogo de ação e estratégia 2D desenvolvido em Python com a biblioteca **PyGame**. Inspirado no clássico *Crossy Road*, o objetivo é guiar um estudante do CIn em uma jornada desafiadora até chegar no CIn.
 
 O jogador deve avançar por um mapa gerado proceduralmente, desviando de **ônibus circulares**, **carros** e **obras**, enquanto gerencia seus recursos coletando **fragmentos de crachá** (pontuação), **energéticos** (efeito de câmera lenta) e **escudos** (proteção contra dano).
 
@@ -73,25 +73,30 @@ A classe Game centraliza e protege o estado do jogo (pontuação, vidas, mapa), 
 ---
 ## 🛠️ Ferramentas Utilizadas
 
-* **GitHub**
-* **Git**
-* **PyGame**
-* **VS Code**
-* **Gemini**
-* **Canva**
-
+* **Python** - Linguagem Base do Projeto
+* **PyGame** - Biblioteca utilizada para loops, eventos, sprites e renderizar 
+* **Git e Github** - Controle de Versão e Repositório
+* **VS Code** - Ambiente de desenvolvimento do código (IDE)
+* **Gemini** - Criação de Sprites
+* **Canva** - Edição de Sprites
 
 ---
 ## 🤝 Divisão do Trabalho
 
-A equipe foi organizada da seguinte forma:
-
-* **ÁUDIO E IMAGENS:** Davi Rosendo
-* **BACK-END:** João Felipe e João Pedro
-* **FRONT-END:** Vítor e Gabriel Godoy
-* **SUPORTE GERAL:** Davi Mello
-
-
+**Áudio e Imagens:**
+* Davi Rosendo
+* Davi Mello
+**Lógica de movimentação e interação do player com o cenário (obstáculos e coletáveis):**
+* Gabriel Godoy
+* João Pedro
+* Davi Mello
+**Mudança de estado do jogo e funcionamento dos menus:**
+* Davi Rosendo
+* Gabriel Godoy
+* João Pedro
+**Suporte Geral e Apresentação:**
+* Vitor Nunes
+* João Felipe
 
 --
 
