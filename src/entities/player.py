@@ -5,7 +5,6 @@ from src.entities.entity_base import Entity
 
 class Player(Entity):
     def __init__(self, start_grid_x, start_grid_y, skin_filename):
-        # Inicializa a Entity
         super().__init__(start_grid_x * BLOCK_SIZE, start_grid_y * BLOCK_SIZE, 
                          BLOCK_SIZE, BLOCK_SIZE, (0, 0, 255), None)
         
@@ -14,10 +13,8 @@ class Player(Entity):
         
         self.lives = 3             
         self.has_shield = False    
-        
-        # --- NOVO: INVENCIBILIDADE ---
-        self.invulnerable_timer = 0 # Tempo restante de invencibilidade
-        # -----------------------------
+
+        self.invulnerable_timer = 0 
 
         self.images = {} 
         self.current_direction = None 
@@ -85,41 +82,34 @@ class Player(Entity):
         self.rect.x = self.grid_x * BLOCK_SIZE
         self.rect.y = self.grid_y * BLOCK_SIZE
         self.update_sprite("front")
-        
-        # Ao renascer, ganha invencibilidade breve (2 segundos)
+
         self.invulnerable_timer = 120 
 
     def check_damage(self):
         """Retorna True se tomou dano real, False se foi protegido"""
-        
-        # 1. Se já está invulnerável (piscando), não toma dano
+
         if self.invulnerable_timer > 0:
             return False
 
-        # 2. Se tem escudo, usa o escudo e ganha invencibilidade breve
         if self.has_shield:
             print("🛡️ ESCUDO PROTEGEU!")
             self.has_shield = False 
-            self.invulnerable_timer = 60 # 1 segundo de proteção pós-quebra
+            self.invulnerable_timer = 60 
             return False 
-        
-        # 3. Toma dano real
+
         else:
             self.lives -= 1
             print(f"💔 DANO! Vidas restantes: {self.lives}")
-            self.invulnerable_timer = 120 # 2 segundos invencível após morrer/renascer
+            self.invulnerable_timer = 120 
             return True 
 
     def update(self):
-        # Lógica de Invencibilidade (Piscar)
         if self.invulnerable_timer > 0:
             self.invulnerable_timer -= 1
-            
-            # Pisca a cada 5 frames
+
             if (self.invulnerable_timer // 5) % 2 == 0:
-                self.image.set_alpha(50) # Quase transparente
+                self.image.set_alpha(50) 
             else:
-                self.image.set_alpha(255) # Visível
+                self.image.set_alpha(255) 
         else:
-            # Garante que está visível se timer acabou
             self.image.set_alpha(255)
