@@ -4,17 +4,14 @@ from src.entities.entity_base import Entity
 
 class Player(Entity):
     def __init__(self, start_grid_x, start_grid_y):
-        # Converte grade para pixels
         x_pixel = start_grid_x * BLOCK_SIZE
         y_pixel = start_grid_y * BLOCK_SIZE
         
         super().__init__(x_pixel, y_pixel, BLOCK_SIZE, BLOCK_SIZE, (0, 0, 255), "aluno.png")
-        
-        # Posição Lógica
+
         self.grid_x = start_grid_x
         self.grid_y = start_grid_y
-        
-        # Atributos
+
         self.lives = 3             
         self.has_shield = False    
 
@@ -47,9 +44,9 @@ class Player(Entity):
         """
         if self.has_shield:
             print("🛡️ ESCUDO PROTEGEU!")
-            self.has_shield = False # Quebra o escudo
-            return False # Não sofreu dano real
+            self.has_shield = False 
+            return False 
         else:
             self.lives -= 1
             print(f"💔 DANO! Vidas restantes: {self.lives}")
-            return True # Sofreu dano real
+            return True 
