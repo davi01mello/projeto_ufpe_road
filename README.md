@@ -44,10 +44,12 @@ projeto/
 
 ## Capturas de tela
 
+![Tela de Inicio](assets/img/TeladeInicio.png)
 
+![Seleção dos Personagens](assets/img/selecao.png)
 
+![In Game](assets/img/ingame.png)
 
----
 ---
 
 ## Conceitos de POO aplicados: 
